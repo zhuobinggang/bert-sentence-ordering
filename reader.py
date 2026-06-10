@@ -67,12 +67,25 @@ def default_sentence_prefix():
     return sentence_prefix_ids
 
 def default_paragraph_prefix_and_suffix():
+    common.print_once("不使用Sentence ordering:")
     toker = default_tokenizer()
     paragraph_prefx = f'{toker.cls_token} ' # keep the space at the end
     paragraph_prefx_ids = toker.encode(paragraph_prefx, add_special_tokens=False)
     paragraph_suffix = f' {toker.sep_token}' # keep the space at the beginning
     paragraph_suffix_ids = toker.encode(paragraph_suffix, add_special_tokens=False)
     return paragraph_prefx_ids, paragraph_suffix_ids
+
+def paragraph_prefix_suffix_with_instruct():
+    common.print_once("使用Sentence ordering:")
+    toker = default_tokenizer()
+    paragraph_prefx = f'{toker.cls_token} Sentence ordering: ' # keep the space at the end
+    paragraph_prefx_ids = toker.encode(paragraph_prefx, add_special_tokens=False)
+    paragraph_suffix = f' {toker.sep_token}' # keep the space at the beginning
+    paragraph_suffix_ids = toker.encode(paragraph_suffix, add_special_tokens=False)
+    return paragraph_prefx_ids, paragraph_suffix_ids
+
+def add_one(lst):
+    return [x + 1 for x in lst]
 
 def sind_data_prepare(paragraphs = None):
     results = []
@@ -86,13 +99,16 @@ def sind_data_prepare(paragraphs = None):
     # 句子前缀
     sentence_prefix_ids = default_sentence_prefix()
     # 段落前缀和后缀
-    paragraph_prefx_ids, paragraph_suffix_ids = default_paragraph_prefix_and_suffix()
+    if common.args.instruction:
+        paragraph_prefx_ids, paragraph_suffix_ids = paragraph_prefix_suffix_with_instruct()
+    else:
+        paragraph_prefx_ids, paragraph_suffix_ids = default_paragraph_prefix_and_suffix()
     # MASK TOKEN的ID
     mask_token_id = toker.mask_token_id
     for paragraph in paragraphs:
         assert len(paragraph) == 5, "Each story should have 5 sentences"
         # 打乱句子和标签
-        indexs = list(range(len(paragraph)))
+        indexs = add_one(list(range(len(paragraph))))# NOTE: 标签从1开始
         index_sentence_pairs = list(zip(indexs, paragraph))
         random.shuffle(index_sentence_pairs)
         indexs, paragraph = zip(*index_sentence_pairs)
@@ -161,7 +177,7 @@ def fix_predicted_sequence(pred):
     pred = np.array(pred)
     # argsort 的两次调用是推荐的获取 Rank 且不重复的标准做法
     fixed_sequence = np.argsort(np.argsort(pred))
-    return fixed_sequence.tolist()
+    return add_one(fixed_sequence.tolist())
 
 def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
     if need_fix:
@@ -195,12 +211,13 @@ def default_bert_decode_acc(split):
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
     all_true_labels = []
+    reversed_dict = reverse_indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
         predicted_labels = decode_by_default_model(bert_input.input_ids)
         true_labels = [label for label in bert_input.labels if label != -100]
         assert len(predicted_labels) == len(true_labels) == 5, "There should be exactly 5 predicted and true labels"
-        predicted_labels = [reverse_indexs_tokenized()[a] for a in predicted_labels]
-        true_labels = [reverse_indexs_tokenized()[b] for b in true_labels]
+        predicted_labels = [reversed_dict.get(a, 1) for a in predicted_labels]
+        true_labels = [reversed_dict[b] for b in true_labels]
         all_predicted_labels.append(predicted_labels)
         all_true_labels.append(true_labels)
     # 在修正标签之前计算一次
@@ -215,11 +232,24 @@ def calculate_random_baseline(split):
     all_true_labels = []
     all_predicted_labels = []
     for paragraph in paragraphs:
-        indexs = list(range(len(paragraph)))
+        indexs = add_one(list(range(len(paragraph))))
         random.shuffle(indexs)
         all_true_labels.append(indexs)
-        predicts = list(range(len(paragraph)))
+        predicts = add_one(list(range(len(paragraph))))
         random.shuffle(predicts)
         all_predicted_labels.append(predicts)
     cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
  
+
+def calculate_all_one_baseline(split):
+    paragraphs = sind_only_texts_get_by_split(split)
+    all_true_labels = []
+    all_predicted_labels = []
+    for paragraph in paragraphs:
+        indexs = add_one(list(range(len(paragraph))))
+        random.shuffle(indexs)
+        all_true_labels.append(indexs)
+        predicts = [1] * len(paragraph) # 全部预测为1
+        all_predicted_labels.append(predicts)
+    all_predicted_labels = [fix_predicted_sequence(pred) for pred in all_predicted_labels]
+    cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
