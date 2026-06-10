@@ -9,6 +9,8 @@ import random
 from scipy.stats import kendalltau
 from tqdm import tqdm
 import numpy as np
+import common
+import os
 
 MAX_TOKENS = 512
 NEED_PAD = True
@@ -17,7 +19,8 @@ def calculate_dataset_length_SIND():
     prefixs = ['train', 'val', 'test']
     story_count = 0
     for prefix in prefixs:
-        with open(f'/home/zhuobinggang/Downloads/SIS-with-labels/sis/{prefix}.story-in-sequence.json' , 'r', encoding='utf-8') as file:
+        the_path = os.path.join(common.dataset_base, f'SIND/{prefix}.story-in-sequence.json')
+        with open(the_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
             split_story_count = len(data['annotations']) / 5 # 每个故事包含5个句子
             print(prefix, split_story_count)
@@ -40,7 +43,8 @@ def calculate_dataset_length_ROCS():
 # 'We ended the day shooting off some fireworks.']
 def sind_only_texts_get_by_split(split):
     only_texts = []
-    with open(f'/home/zhuobinggang/Downloads/SIS-with-labels/sis/{split}.story-in-sequence.json' , 'r', encoding='utf-8') as file:
+    the_path = os.path.join(common.dataset_base, f'SIND/{split}.story-in-sequence.json')
+    with open(the_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
     for item in data['annotations']:
         only_texts.append(item[0]['original_text'])
