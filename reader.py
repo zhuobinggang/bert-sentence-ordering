@@ -11,9 +11,13 @@ from tqdm import tqdm
 import numpy as np
 import common
 import os
+import torch
+from torch import optim
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
 MAX_TOKENS = 512
 NEED_PAD = True
+BATCH_SIZE = 4 if common.LOCAL else 32
 
 def calculate_dataset_length_SIND():  
     prefixs = ['train', 'val', 'test']
@@ -149,10 +153,11 @@ def test():
     for item in results:
         print(item)
 
-def decode_by_default_model(input_ids):
+def decode_by_bert(input_ids, bert=None):
     import torch
     toker = default_tokenizer()
-    bert = default_bert()
+    if bert is None:
+        bert = default_bert()
     input_ids = torch.tensor([input_ids]).to(DEVICE)
     with torch.no_grad():
         logits = bert(input_ids = input_ids).logits # [1, 512, 30522]
@@ -195,6 +200,7 @@ def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
         accs.append(acc)
     avg_acc = sum(accs) / len(accs)
     print(f"Average accuracy (after fixing): {avg_acc}")
+    return avg_tau, avg_acc
 
 
 # @acc = 0.212
@@ -203,7 +209,9 @@ def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
 # 对标签进行修正后重新计算
 # @acc = 0.202
 # @tau = 0.022
-def default_bert_decode_acc(split):
+def valid_bert(bert = None, split = 'val'):
+    if bert is None:
+        bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     paragraphs = sind_only_texts_get_by_split(split)
@@ -213,7 +221,7 @@ def default_bert_decode_acc(split):
     all_true_labels = []
     reversed_dict = reverse_indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
-        predicted_labels = decode_by_default_model(bert_input.input_ids)
+        predicted_labels = decode_by_bert(bert_input.input_ids, bert)
         true_labels = [label for label in bert_input.labels if label != -100]
         assert len(predicted_labels) == len(true_labels) == 5, "There should be exactly 5 predicted and true labels"
         predicted_labels = [reversed_dict.get(a, 1) for a in predicted_labels]
@@ -221,10 +229,10 @@ def default_bert_decode_acc(split):
         all_predicted_labels.append(predicted_labels)
         all_true_labels.append(true_labels)
     # 在修正标签之前计算一次
-    cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
+    avg_tau, avg_acc = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
     print("Now fixing predicted labels and recalculating metrics...")
-    cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
-    return all_predicted_labels, all_true_labels
+    _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
+    return avg_tau, avg_acc
 
 
 def calculate_random_baseline(split):
@@ -253,3 +261,60 @@ def calculate_all_one_baseline(split):
         all_predicted_labels.append(predicts)
     all_predicted_labels = [fix_predicted_sequence(pred) for pred in all_predicted_labels]
     cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
+
+
+def save_checkpoint(bert, base_path = 'checkpoints', epoch = -1, valid_score = -1, suffix = ''):
+    # path = f'{base_path}/{self.prefix}_epoch_{epoch}.pth'
+    path = f'{base_path}/SIND_best_{suffix}.pth'
+    torch.save({
+        'epoch': epoch,
+        'state': bert.state_dict(),
+        'valid_score': valid_score,
+    }, path)
+
+def load_checkpoint(bert, path):
+    checkpoint = torch.load(path, map_location='cpu', weights_only=True)
+    bert.load_state_dict(checkpoint['state'])
+    bert.valid_score = checkpoint.get('valid_score', -1)
+    bert.stop_epoch = checkpoint.get('epoch', -1)
+
+def train(epochs = 5):
+    # 1. 准备训练数据
+    paragraphs = sind_only_texts_get_by_split('train')
+    bert_inputs = sind_data_prepare(paragraphs)
+    all_input_ids = torch.tensor([bert_input.input_ids for bert_input in bert_inputs], dtype=torch.long)
+    all_attention_mask = torch.tensor([bert_input.attention_mask for bert_input in bert_inputs], dtype=torch.long)
+    all_label_ids = torch.tensor([bert_input.labels for bert_input in bert_inputs], dtype=torch.long)
+    train_data = TensorDataset(all_input_ids, all_attention_mask, all_label_ids)
+    train_sampler = RandomSampler(train_data)
+    train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE)
+    # 记录日志
+    logger = common.logging.getLogger(__name__)
+    writer = common.get_writer()
+    # Train
+    from accelerate import Accelerator
+    accelerator = Accelerator()
+    # model.cuda()
+    model = default_bert()
+    model.train()
+    optimizer = optim.AdamW(model.parameters(), lr=5e-5)
+    model, optimizer, train_dataloader = accelerator.prepare(
+        model, optimizer, train_dataloader
+    )
+    for epoch in range(epochs): # 训练指定数量的epoch
+        for batch_idx, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+            if batch_idx % 1000 == 0:
+                logger.warning(f'{common.get_time_str()} Training iteration {batch_idx}')
+            input_ids, attention_mask, label_ids = batch
+            # NOTE: 2025.5.11 RoBERTa don't use token_type_ids! Error happens if use it!
+            outputs = model(input_ids=input_ids.to(DEVICE), 
+                    attention_mask=attention_mask.to(DEVICE),
+                    labels=label_ids.to(DEVICE))
+            loss = outputs.loss
+            accelerator.backward(loss)
+            writer.add_scalar(f'Loss', loss.item(), writer.global_step)
+            writer.global_step += 1
+            optimizer.step()
+            optimizer.zero_grad()
+        save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=-1, suffix=f'e{epoch}')
+    return model
