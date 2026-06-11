@@ -22,6 +22,7 @@ parser.add_argument('-inst', '--instruction', action='store_true', help='Whether
 # parser.add_argument('-nav', '--navigator', action='store_true', help='Whether to use the navigator')
 # parser.add_argument('-cgen', '--cmdgen', action='store_true', help='Whether to use command generate game and dataset')
 # parser.add_argument('-rawcmd', '--rawcmd', action='store_true', help='Whether to use raw commands without filtering')
+parser.add_argument('-n', '--nsteps', type=int, default=1, help='Number of steps for decoding')
 args = parser.parse_args()
 
 def get_time_str():
