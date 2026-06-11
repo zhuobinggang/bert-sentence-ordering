@@ -263,8 +263,8 @@ def valid_bert_batched(bert = None, split = 'val'):
             logits = bert(input_ids=input_ids, attention_mask=attention_mask).logits # # [batch_size, 512, 30522]
         # mask_token_index = (input_ids == toker.mask_token_id).nonzero(as_tuple=True)
         for i in range(input_ids.size(0)): # 遍历batch中的每个样本
-            mask_token_index = torch.where(input_ids[i] == toker.mask_token_id) # 
-            predicted_token_ids = logits[i, mask_token_index].argmax(axis=-1) # [5]
+            mask_token_bool = (input_ids[i] == toker.mask_token_id)
+            predicted_token_ids = logits[i, mask_token_bool].argmax(axis=-1) # [5]
             true_label_ids = label_ids[i][label_ids[i] != -100] # [5]
             assert len(predicted_token_ids) == len(true_label_ids) == 5, "There should be exactly 5 predicted and true labels"
             predicted_labels = [reversed_dict.get(a.item(), 5) for a in predicted_token_ids]
