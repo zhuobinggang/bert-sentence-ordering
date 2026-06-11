@@ -153,13 +153,14 @@ def test():
     for item in results:
         print(item)
 
-def decode_by_bert(input_ids, bert=None):
+def decode_by_bert(input_ids, attention_mask, bert=None):
     toker = default_tokenizer()
     if bert is None:
         bert = default_bert()
     input_ids = torch.tensor([input_ids]).to(DEVICE)
+    attention_mask = torch.tensor([attention_mask]).to(DEVICE)
     with torch.no_grad():
-        logits = bert(input_ids = input_ids).logits # [1, 512, 30522]
+        logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
     mask_token_index = (input_ids == toker.mask_token_id)[0].nonzero(as_tuple=True)[0]
     predicted_token_ids = logits[0, mask_token_index].argmax(axis=-1)
     assert len(predicted_token_ids) == 5, "There should be exactly 5 predicted token ids"
@@ -198,7 +199,7 @@ def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
         acc = cal_acc(predicted_labels, true_labels)
         accs.append(acc)
     avg_acc = sum(accs) / len(accs)
-    print(f"Average accuracy (after fixing): {avg_acc}")
+    print(f"Average accuracy: {avg_acc}")
     return avg_tau, avg_acc
 
 
@@ -229,7 +230,7 @@ def valid_bert(bert = None, split = 'val'):
     all_true_labels = []
     reversed_dict = reverse_indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
-        predicted_labels = decode_by_bert(bert_input.input_ids, bert)
+        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
         true_labels = [label for label in bert_input.labels if label != -100]
         assert len(predicted_labels) == len(true_labels) == 5, "There should be exactly 5 predicted and true labels"
         predicted_labels = [reversed_dict.get(a, 5) for a in predicted_labels]
