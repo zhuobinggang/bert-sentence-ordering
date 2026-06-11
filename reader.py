@@ -51,6 +51,7 @@ def calculate_dataset_length_ROCS():
 def sind_only_texts_get_by_split(split):
     only_texts = []
     the_path = os.path.join(common.dataset_base, f'SIND/{split}.story-in-sequence.json')
+    print(f"Loading SIND dataset from {the_path}...")
     with open(the_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
     for item in data['annotations']:
