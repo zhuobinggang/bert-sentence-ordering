@@ -14,6 +14,9 @@ import os
 import torch
 from torch import optim
 from torch.utils.data import DataLoader, RandomSampler, TensorDataset
+from recordclass import recordclass
+
+TestResult = recordclass('TestResult', 'tau acc pmr')
 
 MAX_TOKENS = 512
 NEED_PAD = True
@@ -174,6 +177,12 @@ def cal_acc(predicted_labels, true_labels):
     correct_count = sum(p == t for p, t in zip(predicted_labels, true_labels))
     return correct_count / len(true_labels)
 
+def cal_PMR(predicted_labels, true_labels):
+    for p, t in zip(predicted_labels, true_labels):
+        if p != t:
+            return 0
+    return 1
+
 def fix_predicted_sequence(pred):
     """
     将包含重复序号的非法序列，转换为合法的无重复置换序列。
@@ -184,7 +193,7 @@ def fix_predicted_sequence(pred):
     fixed_sequence = np.argsort(np.argsort(pred))
     return add_one(fixed_sequence.tolist())
 
-def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
+def cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False):
     if need_fix:
         all_predicted_labels = [fix_predicted_sequence(pred) for pred in all_predicted_labels]
         all_true_labels = [fix_predicted_sequence(true) for true in all_true_labels]
@@ -200,7 +209,13 @@ def cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False):
         accs.append(acc)
     avg_acc = sum(accs) / len(accs)
     print(f"Average accuracy: {avg_acc}")
-    return avg_tau, avg_acc
+    pmrs = []
+    for predicted_labels, true_labels in zip(all_predicted_labels, all_true_labels):
+        pmr = cal_PMR(predicted_labels, true_labels)
+        pmrs.append(pmr)
+    avg_pmr = sum(pmrs) / len(pmrs)
+    print(f"Average PMR: {avg_pmr}")
+    return TestResult(tau=avg_tau, acc=avg_acc, pmr=avg_pmr)
 
 
 def bert_inputs_to_dataloader(bert_inputs):
@@ -238,10 +253,10 @@ def valid_bert(bert = None, split = 'val'):
         all_predicted_labels.append(predicted_labels)
         all_true_labels.append(true_labels)
     # 在修正标签之前计算一次
-    avg_tau, avg_acc = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
-    print("Now fixing predicted labels and recalculating metrics...")
-    _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
-    return avg_tau, avg_acc
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
 
 def valid_bert_batched(bert = None, split = 'val'):
     if bert is None:
@@ -273,10 +288,10 @@ def valid_bert_batched(bert = None, split = 'val'):
             all_predicted_labels.append(predicted_labels)
             all_true_labels.append(true_labels)
     # 在修正标签之前计算一次
-    avg_tau, avg_acc = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
-    print("Now fixing predicted labels and recalculating metrics...")
-    _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
-    return avg_tau, avg_acc
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
 
 
 def calculate_random_baseline(split):
@@ -290,8 +305,8 @@ def calculate_random_baseline(split):
         predicts = add_one(list(range(len(paragraph))))
         random.shuffle(predicts)
         all_predicted_labels.append(predicts)
-    cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
- 
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    return test_result
 
 def calculate_all_one_baseline(split):
     paragraphs = sind_only_texts_get_by_split(split)
@@ -304,7 +319,8 @@ def calculate_all_one_baseline(split):
         predicts = [1] * len(paragraph) # 全部预测为1
         all_predicted_labels.append(predicts)
     all_predicted_labels = [fix_predicted_sequence(pred) for pred in all_predicted_labels]
-    cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = False)
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    return test_result
 
 
 def save_checkpoint(bert, base_path = 'checkpoints', epoch = -1, valid_score = -1, suffix = ''):
