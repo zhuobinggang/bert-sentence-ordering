@@ -23,7 +23,7 @@ def decode_by_bert_one_step(input_ids, attention_mask, bert=None):
     decoded_indice = mask_token_indices[max_logits_index].item() # 获取对应的输入位置索引
     return predicted_token_id, decoded_indice
 
-def valid_bert_n_steps(bert = None, split = 'val', num_samples=100, n_steps=2):
+def valid_bert_n_steps(bert = None, split = 'val', num_samples=None, n_steps=2):
     if bert is None:
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
