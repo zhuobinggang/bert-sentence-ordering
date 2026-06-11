@@ -37,19 +37,27 @@ def valid_bert_n_steps(bert = None, split = 'val', num_samples=100, n_steps=2):
     all_true_labels = []
     reversed_dict = reverse_indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
+        step_predicted_labels = []
+        step_true_labels = []
         for step in range(n_steps):
             predicted_token_id, decoded_indice = decode_by_bert_one_step(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
             # true_label_ids = [label for label in bert_input.labels if label != -100]
             true_label_id = bert_input.labels[decoded_indice]
             predicted_label = reversed_dict.get(predicted_token_id, 5) # 如果预测的token_id不在字典中，默认标签为5（表示无法预测）
             true_label = reversed_dict[true_label_id]
-            all_predicted_labels.append(predicted_label)
-            all_true_labels.append(true_label)
+            step_predicted_labels.append(predicted_label)
+            step_true_labels.append(true_label)
             bert_input.input_ids[decoded_indice] = predicted_token_id # 将预测的token_id替换到输入中，进行下一步解码
-    assert len(all_predicted_labels) == n_steps * len(bert_inputs), "预测标签数量应该是输入数量的两倍"
-    acc = cal_acc(all_predicted_labels, all_true_labels)
-    print(f"\n{n_steps}-step decoding accuracy: {acc:.4f}")
+        all_predicted_labels.append(step_predicted_labels)
+        all_true_labels.append(step_true_labels)
+    # assert len(all_predicted_labels) == n_steps * len(bert_inputs), "预测标签数量应该是输入数量的两倍"
+    return all_predicted_labels, all_true_labels
 
+def valid_bert_n_steps_flatten_acc(bert = None, split = 'val', num_samples=100, n_steps=2):
+    all_predicted_labels, all_true_labels = valid_bert_n_steps(bert, split, num_samples, n_steps)
+    all_predicted_labels = [a for nest_list in all_predicted_labels for a in nest_list] # 过滤掉无法预测的标签
+    all_true_labels = [a for nest_list in all_true_labels for a in nest_list]
+    print(cal_acc(all_predicted_labels, all_true_labels))
 
 # Example usage
 # 1-step decoding accuracy: 0.88
@@ -68,5 +76,5 @@ if __name__ == '__main__':
     
     # 测试第一步准确率
     # valid_bert_first_step(bert, 'val', num_samples=100)
-    valid_bert_n_steps(bert, 'val', num_samples=100, n_steps=args.nsteps)
+    valid_bert_n_steps_flatten_acc(bert, 'val', num_samples=10, n_steps=args.nsteps)
 
