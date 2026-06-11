@@ -6,6 +6,8 @@
 from reader import *
 import torch
 
+
+# First-step full sequence accuracy: 0.8800
 def valid_bert_first_step(bert=None, split='val', num_samples=None):
     """
     验证第一步解码的准确率（不更新输入，只在原始输入上预测一次）。
@@ -47,8 +49,15 @@ def valid_bert_first_step(bert=None, split='val', num_samples=None):
             mask_token_bool = (input_ids[i] == toker.mask_token_id)
             predicted_token_ids = logits[i, mask_token_bool].argmax(axis=-1)  # [5]
             true_label_ids = label_ids[i][label_ids[i] != -100]  # [5]
-            
-            assert len(predicted_token_ids) == len(true_label_ids) == 5
+
+            # 只保留logits最大的predicted_token_ids和对应的true_label_ids
+            max_logits = logits[i, mask_token_bool].max(dim=-1).values # 预测的最大logits值
+            max_logits_index = max_logits.argmax() # 最大logits值的索引
+            predicted_token_ids = predicted_token_ids[max_logits_index].unsqueeze(0) # 只保留最大logits对应的预测标签
+            true_label_ids = true_label_ids[max_logits_index].unsqueeze(0) # 只保留最大logits对应的真实
+
+
+            assert len(predicted_token_ids) == len(true_label_ids) == 1
             
             predicted_labels = [reversed_dict.get(a.item(), 5) for a in predicted_token_ids]
             true_labels = [reversed_dict[b.item()] for b in true_label_ids]
@@ -56,13 +65,16 @@ def valid_bert_first_step(bert=None, split='val', num_samples=None):
             all_predicted_labels.append(predicted_labels)
             all_true_labels.append(true_labels)
     
-    # 计算全序列准确率
-    correct = sum(1 for p, t in zip(all_predicted_labels, all_true_labels) if p == t)
-    accuracy = correct / len(all_predicted_labels)
+    # 计算准确率
+    accs = []
+    for predicted_labels, true_labels in zip(all_predicted_labels, all_true_labels):
+        acc = cal_acc(predicted_labels, true_labels)
+        accs.append(acc)
+    avg_acc = sum(accs) / len(accs)
     
-    print(f"\nFirst-step full sequence accuracy: {accuracy:.4f} ({correct}/{len(all_predicted_labels)})")
+    print(f"\nFirst-step full sequence accuracy: {avg_acc:.4f}")
     
-    return accuracy
+    return avg_acc
 
 
 # Example usage
