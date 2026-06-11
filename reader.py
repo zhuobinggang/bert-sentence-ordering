@@ -165,8 +165,8 @@ def decode_by_bert(input_ids, attention_mask, bert=None):
     attention_mask = torch.tensor([attention_mask]).to(DEVICE)
     with torch.no_grad():
         logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
-    mask_token_index = (input_ids == toker.mask_token_id)[0].nonzero(as_tuple=True)[0]
-    predicted_token_ids = logits[0, mask_token_index].argmax(axis=-1)
+    mask_token_bool = (input_ids == toker.mask_token_id)
+    predicted_token_ids = logits[mask_token_bool].argmax(axis=-1)  # [5]
     assert len(predicted_token_ids) == 5, "There should be exactly 5 predicted token ids"
     return predicted_token_ids.tolist()
 

@@ -77,6 +77,46 @@ def valid_bert_first_step(bert=None, split='val', num_samples=None):
     return avg_acc
 
 
+def decode_by_bert_one_step(input_ids, attention_mask, bert=None):
+    toker = default_tokenizer()
+    if bert is None:
+        bert = default_bert()
+    input_ids = torch.tensor([input_ids]).to(DEVICE)
+    attention_mask = torch.tensor([attention_mask]).to(DEVICE)
+    with torch.no_grad():
+        logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
+    mask_token_bool = (input_ids == toker.mask_token_id)
+    predicted_token_ids = logits[mask_token_bool].argmax(axis=-1)  # [5]
+    assert len(predicted_token_ids) == 5, "There should be exactly 5 predicted token ids"
+    return predicted_token_ids.tolist()
+
+def valid_bert_two_steps(bert = None, split = 'val', num_samples=100):
+    if bert is None:
+        bert = default_bert()
+    # 首先将val数据集转换成BertInput格式
+    # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
+    paragraphs = sind_only_texts_get_by_split(split)
+    if num_samples is not None:
+        paragraphs = paragraphs[:num_samples]
+    bert_inputs = sind_data_prepare(paragraphs)
+    # 然后使用默认的BERT模型进行解码，计算准确率和tau值
+    all_predicted_labels = []
+    all_true_labels = []
+    reversed_dict = reverse_indexs_tokenized()
+    for bert_input in tqdm(bert_inputs):
+        predicted_labels = decode_by_bert_one_step(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
+        true_labels = [label for label in bert_input.labels if label != -100]
+        assert len(predicted_labels) == len(true_labels) == 5, "There should be exactly 5 predicted and true labels"
+        predicted_labels = [reversed_dict.get(a, 5) for a in predicted_labels]
+        true_labels = [reversed_dict[b] for b in true_labels]
+        all_predicted_labels.append(predicted_labels)
+        all_true_labels.append(true_labels)
+    # 在修正标签之前计算一次
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
+
 # Example usage
 if __name__ == '__main__':
     bert = default_bert()
@@ -88,4 +128,5 @@ if __name__ == '__main__':
     print("=" * 60)
     
     # 测试第一步准确率
-    valid_bert_first_step(bert, 'val', num_samples=100)
+    # valid_bert_first_step(bert, 'val', num_samples=100)
+    valid_bert_two_steps(bert, 'val', num_samples=100)
