@@ -1,11 +1,15 @@
 # experiments on ROCStories dataset
 from datasets import load_dataset, concatenate_datasets
 
-def dataset_get():
+def mixed_dataset_get():
     ds = load_dataset("mintujupally/ROCStories")
     train_ds = ds['train']
     test_ds = ds['test']
     mixied_ds = concatenate_datasets([train_ds, test_ds])
+    return mixied_ds
+
+def dataset_get():
+    mixied_ds = mixed_dataset_get()
     # split the mixed dataset into 80% train, 10% val, 10% test
     train_test = mixied_ds.train_test_split(test_size=0.2, seed=42)
     val_test = train_test['test'].train_test_split(test_size=0.5, seed=42)
@@ -17,7 +21,7 @@ def dataset_get():
 def story_split_prepare():
     import spacy
     nlp = spacy.load("en_core_web_sm")
-    ds = load_dataset("mintujupally/ROCStories")
+    ds = mixed_dataset_get()
     paragraphs = []
     for item in ds:
         story = item['text']

@@ -428,7 +428,7 @@ def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dat
             steps += 1
             if steps % 1000 == 0:
                 model.eval()
-                score = valid_bert_batched(model, data_loader=val_dataloader)
+                score = valid_bert_batched(model, dataloader=val_dataloader)
                 model.train()
                 print(f'{steps}检验模型，当前验证结果: {score}')
                 if score.acc > MAX_ACC:
@@ -436,7 +436,7 @@ def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dat
                     MAX_ACC = score.acc
                     save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     model.eval()
-    score = valid_bert_batched(model, data_loader=val_dataloader)
+    score = valid_bert_batched(model, dataloader=val_dataloader)
     model.train()
     print(f'最后一次检验模型，当前验证结果: {score}')
     if score.acc > MAX_ACC:
