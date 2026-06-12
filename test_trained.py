@@ -1,4 +1,4 @@
-from reader import *
+from sind import *
 
 def run():
     bert = default_bert()

@@ -2,6 +2,7 @@
 # train: 40155
 # val: 4990
 # test 5055
+from functools import lru_cache
 import json
 from pydash.arrays import chunk
 from bert_utils import default_tokenizer, BertInput, indexs_tokenized, default_bert, DEVICE, reverse_indexs_tokenized
@@ -58,22 +59,17 @@ def sind_only_texts_get_by_split(split):
         only_texts.append(item[0]['original_text'])
     return chunk(only_texts, 5)
 
-def sind_encode_paragraph(sentence_idss, sentence_prefix_ids, paragraph_prefx_ids, paragraph_suffix_ids):
-    # 加上前缀
-    sentence_idss = [sentence_prefix_ids + sentence_ids for sentence_ids in sentence_idss]
-    # 将每个故事的5个句子拼接成一个段落，加入CLS和SEP
-    paragraph_ids = []
-    for sentence_ids in sentence_idss:
-        paragraph_ids += sentence_ids
-    paragraph_ids = paragraph_prefx_ids + paragraph_ids + paragraph_suffix_ids
-    return paragraph_ids
-
-def default_sentence_prefix():
+# @sentence_index: 句子的索引标记（从1开始），如果不提供则使用MASK token
+@lru_cache(maxsize=10)
+def default_sentence_prefix(sentence_index = None):
     toker = default_tokenizer()
-    sentence_prefix = f'({toker.mask_token}) ' # keep the space at the end
+    if sentence_index is None:
+        sentence_index = toker.mask_token
+    sentence_prefix = f'({sentence_index}) ' # keep the space at the end
     sentence_prefix_ids = toker.encode(sentence_prefix, add_special_tokens=False)
     return sentence_prefix_ids
 
+@lru_cache(maxsize=1)
 def default_paragraph_prefix_and_suffix():
     common.print_once("不使用Sentence ordering:")
     toker = default_tokenizer()
@@ -83,6 +79,7 @@ def default_paragraph_prefix_and_suffix():
     paragraph_suffix_ids = toker.encode(paragraph_suffix, add_special_tokens=False)
     return paragraph_prefx_ids, paragraph_suffix_ids
 
+@lru_cache(maxsize=1)
 def paragraph_prefix_suffix_with_instruct():
     common.print_once("使用Sentence ordering:")
     toker = default_tokenizer()
@@ -95,55 +92,100 @@ def paragraph_prefix_suffix_with_instruct():
 def add_one(lst):
     return [x + 1 for x in lst]
 
-def sind_data_prepare(paragraphs = None):
+def shuffle_paragraph(paragraph, need_add_one = True):
+    indexs = list(range(len(paragraph)))
+    # NOTE: 标签从1开始
+    if need_add_one:
+        indexs = add_one(indexs)
+    index_sentence_pairs = list(zip(indexs, paragraph))
+    random.shuffle(index_sentence_pairs)
+    indexs, paragraph = zip(*index_sentence_pairs)
+    return list(indexs), list(paragraph)
+
+def default_prefix_suffix_provider():
+    sentence_prefix_ids = default_sentence_prefix()
+    paragraph_prefx_ids, paragraph_suffix_ids = default_paragraph_prefix_and_suffix()
+    return sentence_prefix_ids, paragraph_prefx_ids, paragraph_suffix_ids
+
+def sentence_prefix_random_mask(indexs, random_mask_count = 5, output_mask_indices = False):
+    random_mask_count = min(random_mask_count, len(indexs))
+    random_mask_indices = random.sample(range(len(indexs)), random_mask_count) # 随机选择n个句子进行MASK
+    random_mask_indices = sorted(random_mask_indices) # 将随机选择的索引排序，保证顺序不变
+    sentence_prefix_ids_by_sentence = []
+    for i, sentence_index in enumerate(indexs):
+        if i in random_mask_indices:
+            sentence_prefix_ids_by_sentence.append(default_sentence_prefix()) # 使用MASK token作为前缀
+        else:
+            sentence_prefix_ids_by_sentence.append(default_sentence_prefix(sentence_index))
+    if output_mask_indices:
+        return sentence_prefix_ids_by_sentence, random_mask_indices
+    else:
+        return sentence_prefix_ids_by_sentence
+
+# Output:
+# ['( 1 )', '( 2 )', '( 3 )', '( 4 )', '( 5 )']
+# ['( 1 )', '( 2 )', '( 3 )', '( [MASK] )', '( 5 )']
+# ['( [MASK] )', '( 2 )', '( 3 )', '( [MASK] )', '( 5 )']
+# ['( [MASK] )', '( [MASK] )', '( 3 )', '( [MASK] )', '( 5 )']
+# ['( [MASK] )', '( 2 )', '( [MASK] )', '( [MASK] )', '( [MASK] )']
+# ['( [MASK] )', '( [MASK] )', '( [MASK] )', '( [MASK] )', '( [MASK] )']
+def test_sentence_prefix_random_mask():
+    indexs = [1, 2, 3, 4, 5]
+    toker = default_tokenizer()
+    for random_mask_count in range(6):
+        print(toker.decode(sentence_prefix_random_mask(indexs, random_mask_count=random_mask_count)))
+
+# @paragraph: 打乱顺序后的段落文本列表
+# @indexs: 打乱顺序后的标签列表 (从1开始，表示原来的第几句话)
+def create_bert_input_for_shuffled_paragraph(paragraph, indexs, MAX_SENTENCE_IDS = 96, paragraph_prefix_suffix_provider = default_paragraph_prefix_and_suffix, random_mask_count = 5):
+    toker = default_tokenizer()
+    labels = [indexs_tokenized()[index] for index in indexs] # 将标签转换为token id
+    # 编码句子
+    sentence_idss = toker.encode(paragraph, add_special_tokens=False)
+    # trim sentence_ids
+    sentence_idss = [sentence_ids[:MAX_SENTENCE_IDS] for sentence_ids in sentence_idss]
+    # 获取前缀和后缀
+    paragraph_prefx_ids, paragraph_suffix_ids = paragraph_prefix_suffix_provider()
+    # 将每个故事的5个句子拼接成一个段落，加入CLS和SEP
+    # 句子前缀
+    common.print_once(f"随机MASK{random_mask_count}个句子前缀!")
+    sentence_prefix_ids_by_sentence, random_mask_indices = sentence_prefix_random_mask(indexs, random_mask_count=random_mask_count, output_mask_indices=True) # 随机选取若干句子进行MASK，默认是全部句子都进行MASK
+    sentence_idss_with_prefix = []
+    for prefix_ids, sentence_ids in zip(sentence_prefix_ids_by_sentence, sentence_idss):
+        sentence_idss_with_prefix.append(prefix_ids + sentence_ids)
+    # 段落前后缀
+    token_ids = paragraph_prefx_ids + [a for sentence_ids in sentence_idss_with_prefix for a in sentence_ids] + paragraph_suffix_ids
+    # 准备label_ids: 将MASK token位置的label_id设置为对应的标签，其余位置设置为-100（在计算loss时会被忽略）
+    label_ids = [-100] * len(token_ids) # -100 will be ignored in loss calculation
+    counter = 0
+    for idx, token_id in enumerate(token_ids):
+        if token_id == toker.mask_token_id:
+            label_ids[idx] = labels[random_mask_indices[counter]] # 只有被MASK的句子才有标签
+            counter += 1
+    # 准备attention_mask: 基本上所有token都参与attention，除了padding部分
+    attention_mask = [1] * len(token_ids)
+    # pad到最大长度
+    if NEED_PAD:
+        extra_length = MAX_TOKENS - len(token_ids)
+        token_ids = token_ids + [toker.pad_token_id] * extra_length
+        label_ids = label_ids + [-100] * extra_length
+        attention_mask = attention_mask + [0] * extra_length
+    bert_input = BertInput(input_ids=token_ids, attention_mask=attention_mask, labels=label_ids)
+    return bert_input
+
+def sind_data_prepare(paragraphs, random_mask_count = 5):
     results = []
-    # 1. 将json文件中的所有annotations
-    if paragraphs is None:
-        paragraphs = sind_only_texts_get_by_split('val')
     # 最大句子长度，超过这个长度的句子将被截断
     MAX_SENTENCE_IDS = 96 
-    # 用tokenizer进行编码
-    toker = default_tokenizer()
-    # 句子前缀
-    sentence_prefix_ids = default_sentence_prefix()
     # 段落前缀和后缀
-    if common.args.instruction:
-        paragraph_prefx_ids, paragraph_suffix_ids = paragraph_prefix_suffix_with_instruct()
-    else:
-        paragraph_prefx_ids, paragraph_suffix_ids = default_paragraph_prefix_and_suffix()
-    # MASK TOKEN的ID
-    mask_token_id = toker.mask_token_id
+    paragraph_prefix_suffix_provider = paragraph_prefix_suffix_with_instruct if common.args.instruction else default_paragraph_prefix_and_suffix
     for paragraph in paragraphs:
         assert len(paragraph) == 5, "Each story should have 5 sentences"
         # 打乱句子和标签
-        indexs = add_one(list(range(len(paragraph))))# NOTE: 标签从1开始
-        index_sentence_pairs = list(zip(indexs, paragraph))
-        random.shuffle(index_sentence_pairs)
-        indexs, paragraph = zip(*index_sentence_pairs)
-        labels = [indexs_tokenized()[index] for index in indexs] # 将标签转换为token id
-        # 编码句子
-        sentence_idss = toker.encode(paragraph, add_special_tokens=False)
-        # trim sentence_ids
-        sentence_idss = [sentence_ids[:MAX_SENTENCE_IDS] for sentence_ids in sentence_idss]
-        # 将每个故事的5个句子拼接成一个段落，加入CLS和SEP
-        token_ids = sind_encode_paragraph(sentence_idss, sentence_prefix_ids, paragraph_prefx_ids, paragraph_suffix_ids)
-        # 准备label_ids
-        label_ids = [-100] * len(token_ids) # -100 will be ignored in loss calculation
-        counter = 0
-        for idx, token_id in enumerate(token_ids):
-            if token_id == mask_token_id:
-                label_ids[idx] = labels[counter]
-                counter += 1
-        assert counter == 5, "There should be exactly 5 MASK tokens in the paragraph"
-        # 准备attention_mask
-        attention_mask = [1] * len(token_ids)
-        # pad到最大长度
-        if NEED_PAD:
-            extra_length = MAX_TOKENS - len(token_ids)
-            token_ids = token_ids + [toker.pad_token_id] * extra_length
-            label_ids = label_ids + [-100] * extra_length
-            attention_mask = attention_mask + [0] * extra_length
-        results.append(BertInput(input_ids=token_ids, attention_mask=attention_mask, labels=label_ids))
+        indexs, paragraph = shuffle_paragraph(paragraph, need_add_one = True) # 标签从1开始
+        # 生成BertInput
+        bert_input = create_bert_input_for_shuffled_paragraph(paragraph, indexs, MAX_SENTENCE_IDS, paragraph_prefix_suffix_provider=paragraph_prefix_suffix_provider, random_mask_count=random_mask_count)
+        results.append(bert_input)
     return results
 
 def input_ids_for_test():
@@ -219,7 +261,7 @@ def cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False):
     return TestResult(tau=avg_tau, acc=avg_acc, pmr=avg_pmr)
 
 
-def bert_inputs_to_dataloader(bert_inputs):
+def bert_inputs_to_dataloader_shffle(bert_inputs):
     all_input_ids = torch.tensor([bert_input.input_ids for bert_input in bert_inputs], dtype=torch.long)
     all_attention_mask = torch.tensor([bert_input.attention_mask for bert_input in bert_inputs], dtype=torch.long)
     all_label_ids = torch.tensor([bert_input.labels for bert_input in bert_inputs], dtype=torch.long)
@@ -259,15 +301,18 @@ def valid_bert(bert = None, split = 'val'):
     # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
-def valid_bert_batched(bert = None, split = 'val'):
+def valid_bert_batched(bert = None, split = 'val', split_length = None):
     if bert is None:
         bert = default_bert()
     toker = default_tokenizer()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     paragraphs = sind_only_texts_get_by_split(split)
+    if split_length is not None:
+        common.print_once(f"只使用{split}前{split_length}个故事进行验证")
+        paragraphs = paragraphs[:split_length]
     bert_inputs = sind_data_prepare(paragraphs)
-    dataloader = bert_inputs_to_dataloader(bert_inputs)
+    dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
     all_true_labels = []
@@ -339,11 +384,11 @@ def load_checkpoint(bert, path):
     bert.valid_score = checkpoint.get('valid_score', -1)
     bert.stop_epoch = checkpoint.get('epoch', -1)
 
-def train(epochs = 5):
+def train(epochs = 5, suffix = ''):
     # 1. 准备训练数据
     paragraphs = sind_only_texts_get_by_split('train')
     bert_inputs = sind_data_prepare(paragraphs)
-    train_dataloader = bert_inputs_to_dataloader(bert_inputs)
+    train_dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()
@@ -357,6 +402,8 @@ def train(epochs = 5):
     model, optimizer, train_dataloader = accelerator.prepare(
         model, optimizer, train_dataloader
     )
+    model_suffix = common.get_time_str() + suffix
+    MAX_ACC = 0
     for epoch in range(epochs): # 训练指定数量的epoch
         for batch_idx, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
             if batch_idx % 1000 == 0:
@@ -372,5 +419,9 @@ def train(epochs = 5):
             writer.global_step += 1
             optimizer.step()
             optimizer.zero_grad()
-        save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=-1, suffix=f'e{epoch}')
+        score = valid_bert_batched(model, split='val', split_length=256)
+        print(f'Validation result after epoch {epoch}: {score}')
+        if score.acc > MAX_ACC:
+            MAX_ACC = score.acc
+            save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     return model

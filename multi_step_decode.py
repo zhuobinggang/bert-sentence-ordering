@@ -1,7 +1,7 @@
 # 多步解码逻辑：
 # 每次预测之后选择置信度最高的一个位置进行输出，填充到输入中，继续下一轮预测，直到所有位置都被预测出来。
 
-from reader import *
+from sind import *
 import torch
 from common import args
 
@@ -61,7 +61,7 @@ def valid_bert_n_steps_flatten_acc(bert = None, split = 'val', num_samples=100, 
 
 # Example usage
 # 1-step decoding accuracy: 0.88
-# 3-step decoding accuracy: 0.7150
+# 2-step decoding accuracy: 0.7150
 # 3-step decoding accuracy: 0.6500
 # 4-step decoding accuracy: 0.5925
 # 5-step decoding accuracy: 0.5480

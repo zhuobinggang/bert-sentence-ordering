@@ -39,7 +39,7 @@ if DEBUG:
 else:
     logging.basicConfig(filename=LOG_FILE, filemode='w', level=logging.WARNING)
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=99) # 记录100个
 def print_once(msg):
     print(msg)
 

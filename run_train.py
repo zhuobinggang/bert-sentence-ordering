@@ -1,3 +1,3 @@
-from reader import *
+from sind import *
 
 train()
