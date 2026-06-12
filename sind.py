@@ -301,14 +301,14 @@ def valid_bert(bert = None, split = 'val'):
     # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
-def valid_bert_batched(bert = None, split = 'val', split_length = None, data_loader = None):
+def valid_bert_batched(bert = None, split = 'val', split_length = None, dataloader = None):
     if bert is None:
         bert = default_bert()
     bert.eval()
     toker = default_tokenizer()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    if data_loader is None:
+    if dataloader is None:
         paragraphs = sind_only_texts_get_by_split(split)
         if split_length is not None:
             common.print_once(f"只使用{split}前{split_length}个故事进行验证")
