@@ -386,10 +386,12 @@ def load_checkpoint(bert, path):
     bert.valid_score = checkpoint.get('valid_score', -1)
     bert.stop_epoch = checkpoint.get('epoch', -1)
 
-def train(epochs = 5, suffix = '', trian_dataloader = None):
-    if trian_dataloader is None:
-        train_dataloader = bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
-    # 准备valid数据集
+def default_trian_dataloader_provider():
+    print('重新制备训练数据集...')
+    return bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
+
+def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dataloader_provider):
+    # 准备valid数据集并固定
     val_dataloader = bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
     # 记录日志
     logger = common.logging.getLogger(__name__)
@@ -406,7 +408,9 @@ def train(epochs = 5, suffix = '', trian_dataloader = None):
     )
     model_suffix = common.get_time_str() + suffix
     MAX_ACC = 0
+    steps = 0
     for epoch in range(epochs): # 训练指定数量的epoch
+        train_dataloader = trian_dataloader_provider()
         for batch_idx, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
             if batch_idx % 1000 == 0:
                 logger.warning(f'{common.get_time_str()} Training iteration {batch_idx}')
@@ -421,11 +425,23 @@ def train(epochs = 5, suffix = '', trian_dataloader = None):
             writer.global_step += 1
             optimizer.step()
             optimizer.zero_grad()
-        model.eval()
-        score = valid_bert_batched(model, data_loader=val_dataloader)
-        model.train()
-        print(f'Validation result after epoch {epoch}: {score}')
-        if score.acc > MAX_ACC:
-            MAX_ACC = score.acc
-            save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
+            steps += 1
+            if steps % 1000 == 0:
+                model.eval()
+                score = valid_bert_batched(model, data_loader=val_dataloader)
+                model.train()
+                print(f'{steps}检验模型，当前验证结果: {score}')
+                if score.acc > MAX_ACC:
+                    print('保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
+                    MAX_ACC = score.acc
+                    save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
+    model.eval()
+    score = valid_bert_batched(model, data_loader=val_dataloader)
+    model.train()
+    print(f'最后一次检验模型，当前验证结果: {score}')
+    if score.acc > MAX_ACC:
+        print('保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
+        MAX_ACC = score.acc
+        save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     return model
+
