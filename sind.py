@@ -384,11 +384,12 @@ def load_checkpoint(bert, path):
     bert.valid_score = checkpoint.get('valid_score', -1)
     bert.stop_epoch = checkpoint.get('epoch', -1)
 
-def train(epochs = 5, suffix = ''):
-    # 1. 准备训练数据
-    paragraphs = sind_only_texts_get_by_split('train')
-    bert_inputs = sind_data_prepare(paragraphs)
-    train_dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
+def train(epochs = 5, suffix = '', trian_dataloader = None):
+    if trian_dataloader is None:
+        # 1. 准备训练数据
+        paragraphs = sind_only_texts_get_by_split('train')
+        bert_inputs = sind_data_prepare(paragraphs)
+        train_dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()
@@ -419,7 +420,9 @@ def train(epochs = 5, suffix = ''):
             writer.global_step += 1
             optimizer.step()
             optimizer.zero_grad()
+        model.eval()
         score = valid_bert_batched(model, split='val', split_length=256)
+        model.train()
         print(f'Validation result after epoch {epoch}: {score}')
         if score.acc > MAX_ACC:
             MAX_ACC = score.acc
