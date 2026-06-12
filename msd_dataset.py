@@ -16,18 +16,33 @@ def test_sind_data_prepare(n = 2):
     print('请检查输出，确认随机MASK的句子标签是否正确！')
 
 
-def train_multi_steps(epochs = 5, suffix = ''):
+def train_multi_steps_add_mask4(epochs = 5, suffix = ''):
     def trian_dataloader_provider():
         print('重新制备mask策略的训练数据集...')
         # 准备训练数据
         paragraphs = sind_only_texts_get_by_split('train')
         bert_inputs = sind_data_prepare(paragraphs, 5) # 5 masks一次，4 masks一次，打乱后重新训练试试
         bert_inputs += sind_data_prepare(paragraphs, 4) # 4 masks一次
-        train_dataloader = bert_inputs_to_dataloader_shffle(bert_inputs) # 这里已经打乱了数据顺序
+        train_dataloader = bert_inputs_to_dataloader_shuffle(bert_inputs) # 这里已经打乱了数据顺序
+        return train_dataloader
+    return train(epochs=epochs, suffix=suffix, trian_dataloader_provider=trian_dataloader_provider)
+
+def train_multi_steps_mask_strategy(epochs = 5, suffix = ''):
+    def trian_dataloader_provider():
+        print('重新制备mask策略的训练数据集...')
+        # 准备训练数据
+        paragraphs = sind_only_texts_get_by_split('train')
+        bert_inputs = sind_data_prepare(paragraphs, 5) # 5 masks一次， 正常训练
+        bert_inputs += sind_data_prepare(paragraphs, 4) # 4 masks一次
+        bert_inputs += sind_data_prepare(paragraphs, 3) # 3 masks一次
+        bert_inputs += sind_data_prepare(paragraphs, 2) # 2 masks一次
+        bert_inputs += sind_data_prepare(paragraphs, 1) # 1 masks一次
+        train_dataloader = bert_inputs_to_dataloader_shuffle(bert_inputs) # 这里已经打乱了数据顺序
         return train_dataloader
     return train(epochs=epochs, suffix=suffix, trian_dataloader_provider=trian_dataloader_provider)
 
 
 if __name__ == "__main__":
     # test_sind_data_prepare(n=2)
-    train_multi_steps(epochs=5, suffix='_mask_strategy_add4')
+    # train_multi_steps(epochs=5, suffix='_mask_strategy_add4')
+    train_multi_steps_mask_strategy(epochs=5, suffix='_mask_strategy_all')

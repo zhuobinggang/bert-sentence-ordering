@@ -76,5 +76,6 @@ if __name__ == '__main__':
     
     # 测试第一步准确率
     # valid_bert_first_step(bert, 'val', num_samples=100)
-    valid_bert_n_steps_flatten_acc(bert, 'val', num_samples=10, n_steps=args.nsteps)
+    all_predicted_labels, all_true_labels = valid_bert_n_steps(bert, 'test', n_steps=5)
+    cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix=False)
 

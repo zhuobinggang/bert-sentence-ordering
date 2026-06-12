@@ -261,7 +261,7 @@ def cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False):
     return TestResult(tau=avg_tau, acc=avg_acc, pmr=avg_pmr)
 
 
-def bert_inputs_to_dataloader_shffle(bert_inputs):
+def bert_inputs_to_dataloader_shuffle(bert_inputs):
     all_input_ids = torch.tensor([bert_input.input_ids for bert_input in bert_inputs], dtype=torch.long)
     all_attention_mask = torch.tensor([bert_input.attention_mask for bert_input in bert_inputs], dtype=torch.long)
     all_label_ids = torch.tensor([bert_input.labels for bert_input in bert_inputs], dtype=torch.long)
@@ -314,7 +314,7 @@ def valid_bert_batched(bert = None, split = 'val', split_length = None, dataload
             common.print_once(f"只使用{split}前{split_length}个故事进行验证")
             paragraphs = paragraphs[:split_length]
         bert_inputs = sind_data_prepare(paragraphs)
-        dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
+        dataloader = bert_inputs_to_dataloader_shuffle(bert_inputs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
     all_true_labels = []
@@ -388,11 +388,11 @@ def load_checkpoint(bert, path):
 
 def default_trian_dataloader_provider():
     print('重新制备训练数据集...')
-    return bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
 
 def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dataloader_provider):
     # 准备valid数据集并固定
-    val_dataloader = bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
+    val_dataloader = bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()
