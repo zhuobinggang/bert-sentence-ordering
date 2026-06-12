@@ -301,18 +301,20 @@ def valid_bert(bert = None, split = 'val'):
     # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
-def valid_bert_batched(bert = None, split = 'val', split_length = None):
+def valid_bert_batched(bert = None, split = 'val', split_length = None, data_loader = None):
     if bert is None:
         bert = default_bert()
+    bert.eval()
     toker = default_tokenizer()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
-    if split_length is not None:
-        common.print_once(f"只使用{split}前{split_length}个故事进行验证")
-        paragraphs = paragraphs[:split_length]
-    bert_inputs = sind_data_prepare(paragraphs)
-    dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
+    if data_loader is None:
+        paragraphs = sind_only_texts_get_by_split(split)
+        if split_length is not None:
+            common.print_once(f"只使用{split}前{split_length}个故事进行验证")
+            paragraphs = paragraphs[:split_length]
+        bert_inputs = sind_data_prepare(paragraphs)
+        dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
     all_true_labels = []
@@ -386,10 +388,9 @@ def load_checkpoint(bert, path):
 
 def train(epochs = 5, suffix = '', trian_dataloader = None):
     if trian_dataloader is None:
-        # 1. 准备训练数据
-        paragraphs = sind_only_texts_get_by_split('train')
-        bert_inputs = sind_data_prepare(paragraphs)
-        train_dataloader = bert_inputs_to_dataloader_shffle(bert_inputs)
+        train_dataloader = bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
+    # 准备valid数据集
+    val_dataloader = bert_inputs_to_dataloader_shffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()
@@ -421,7 +422,7 @@ def train(epochs = 5, suffix = '', trian_dataloader = None):
             optimizer.step()
             optimizer.zero_grad()
         model.eval()
-        score = valid_bert_batched(model, split='val', split_length=256)
+        score = valid_bert_batched(model, data_loader=val_dataloader)
         model.train()
         print(f'Validation result after epoch {epoch}: {score}')
         if score.acc > MAX_ACC:
