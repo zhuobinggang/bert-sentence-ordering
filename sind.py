@@ -390,9 +390,14 @@ def default_trian_dataloader_provider():
     print('重新制备训练数据集...')
     return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
 
-def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dataloader_provider):
+@lru_cache(maxsize=1) # 只缓存验证数据集，训练数据集每次都重新制备，增加随机性
+def default_val_dataloader_provider():
+    print('重新制备验证数据集...')
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
+
+def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dataloader_provider, val_dataloader_provider = default_val_dataloader_provider):
     # 准备valid数据集并固定
-    val_dataloader = bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
+    val_dataloader = val_dataloader_provider()
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()

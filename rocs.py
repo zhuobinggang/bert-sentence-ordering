@@ -1,45 +1,50 @@
 # experiments on ROCStories dataset
-from datasets import load_dataset, concatenate_datasets
+import os
+import common
+import random
+from functools import lru_cache
+from sind import sind_data_prepare, bert_inputs_to_dataloader_shuffle, train
 
+@lru_cache(maxsize=1)
 def mixed_dataset_get():
-    ds = load_dataset("mintujupally/ROCStories")
-    train_ds = ds['train']
-    test_ds = ds['test']
-    mixied_ds = concatenate_datasets([train_ds, test_ds])
-    return mixied_ds
+    import pandas as pd
+    the_path1 = os.path.join(common.dataset_base, f'ROCS/ROCStories_spring2016-ROCStories_spring2016.csv')
+    the_path2 = os.path.join(common.dataset_base, f'ROCS/ROCStories_winter2017-ROCStories_winter2017.csv')
+    df1 = pd.read_csv(the_path1)
+    df2 = pd.read_csv(the_path2)
+    df = pd.concat([df1, df2], ignore_index=True)
+    paragraphs = []
+    for _, row in df.iterrows():
+        paragraph = [row[f'sentence{i}'] for i in range(1, 6)]
+        paragraphs.append(paragraph)
+    return paragraphs
 
+@lru_cache(maxsize=1)
 def dataset_get():
-    mixied_ds = mixed_dataset_get()
-    # split the mixed dataset into 80% train, 10% val, 10% test
-    train_test = mixied_ds.train_test_split(test_size=0.2, seed=42)
-    val_test = train_test['test'].train_test_split(test_size=0.5, seed=42)
-    train_ds = train_test['train']
-    val_ds = val_test['train']
-    test_ds = val_test['test']
+    paragraphs = mixed_dataset_get()
+    random.seed(42)
+    random.shuffle(paragraphs)
+    random.seed()
+    train_ds = paragraphs[:int(0.8*len(paragraphs))]
+    val_ds = paragraphs[int(0.8*len(paragraphs)):int(0.9*len(paragraphs))]
+    test_ds = paragraphs[int(0.9*len(paragraphs)):]
     return train_ds, val_ds, test_ds
 
-def story_split_prepare():
-    import spacy
-    nlp = spacy.load("en_core_web_sm")
-    ds = mixed_dataset_get()
-    paragraphs = []
-    for item in ds:
-        story = item['text']
-        doc = nlp(story)
-        paragraph = [sent.text for sent in doc.sents]
-        assert len(paragraph) == 5, f'每个故事应该有5句话，但发现了{len(paragraph)}句话：{paragraph}'
-        paragraphs.append(paragraph)
-    # store as jsonl
-    import json
-    with open('./temp_datasets/rocstories.jsonl', 'w') as f:
-        for paragraph in paragraphs:
-            json.dump(paragraph, f)
-            f.write('\n')
+def train_dataloader_provider():
+    print('重新制备训练数据集...')
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[0]))
 
+@lru_cache(maxsize=1)
+def val_dataloader_provider():
+    print('重新制备验证数据集...')
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[1]))
 
-def test_story_split():
-    ds = load_dataset("mintujupally/ROCStories")
-    for item in ds:
-        story = item['text']
+@lru_cache(maxsize=1)
+def test_dataloader_provider():
+    print('重新制备测试数据集...')
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[2]))
+
+def train_rocs():
+    _ = train(epochs=5, suffix='_rocs', trian_dataloader_provider=train_dataloader_provider, val_dataloader_provider=val_dataloader_provider)
 
 
