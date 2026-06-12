@@ -47,4 +47,5 @@ def test_dataloader_provider():
 def train_rocs():
     _ = train(epochs=5, suffix='_rocs', trian_dataloader_provider=train_dataloader_provider, val_dataloader_provider=val_dataloader_provider)
 
-
+if __name__ == '__main__':
+    train_rocs()
