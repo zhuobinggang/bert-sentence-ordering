@@ -403,14 +403,14 @@ def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dat
     model = default_bert()
     model.train()
     optimizer = optim.AdamW(model.parameters(), lr=5e-5)
-    model, optimizer, train_dataloader = accelerator.prepare(
-        model, optimizer, train_dataloader
+    model, optimizer = accelerator.prepare(
+        model, optimizer
     )
     model_suffix = common.get_time_str() + suffix
     MAX_ACC = 0
     steps = 0
     for epoch in range(epochs): # 训练指定数量的epoch
-        train_dataloader = trian_dataloader_provider()
+        train_dataloader = accelerator.prepare(trian_dataloader_provider())
         for batch_idx, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
             if batch_idx % 1000 == 0:
                 logger.warning(f'{common.get_time_str()} Training iteration {batch_idx}')
