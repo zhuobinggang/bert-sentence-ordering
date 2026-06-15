@@ -16,6 +16,8 @@ import torch
 from torch import optim
 from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from recordclass import recordclass
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 
 TestResult = recordclass('TestResult', 'tau acc pmr')
 
@@ -199,7 +201,7 @@ def test():
     for item in results:
         print(item)
 
-def decode_by_bert(input_ids, attention_mask, bert=None):
+def decode_by_bert_keep_repeated(input_ids, attention_mask, bert=None):
     toker = default_tokenizer()
     if bert is None:
         bert = default_bert()
@@ -211,6 +213,24 @@ def decode_by_bert(input_ids, attention_mask, bert=None):
     predicted_token_ids = logits[mask_token_bool].argmax(axis=-1)  # [5]
     assert len(predicted_token_ids) == 5, "There should be exactly 5 predicted token ids"
     return predicted_token_ids.tolist()
+
+# 使用匈牙利算法解码得到标签
+def decode_by_bert(input_ids, attention_mask, bert=None):
+    toker = default_tokenizer()
+    if bert is None:
+        bert = default_bert()
+    input_ids = torch.tensor([input_ids]).to(DEVICE)
+    attention_mask = torch.tensor([attention_mask]).to(DEVICE)
+    with torch.no_grad():
+        logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
+    mask_token_bool = (input_ids == toker.mask_token_id)
+    predicted_token_ids = logits[mask_token_bool]  # [5, vocab_size]
+    index_dict = indexs_tokenized()
+    index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
+    predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
+    predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy())
+    assert len(predicted_labels) == 5, "There should be exactly 5 predicted token ids"
+    return predicted_labels.tolist()
 
 def cal_tau(predicted_labels, true_labels):
     tau, _ = kendalltau(predicted_labels, true_labels)
@@ -270,13 +290,8 @@ def bert_inputs_to_dataloader_shuffle(bert_inputs):
     dataloader = DataLoader(datas, sampler=sampler, batch_size=BATCH_SIZE)
     return dataloader
 
-# @acc = 0.212
-# @tau = nan
-# 原因是出现重复的预测标签，导致无法计算kendall tau
-# 对标签进行修正后重新计算
-# @acc = 0.202
-# @tau = 0.022
-def valid_bert(bert = None, split = 'val'):
+# 保留重复标签的版本，直接选取每个位置得分最高的标签，可能会有重复标签，导致tau计算出错
+def valid_bert_keep_repeated(bert = None, split = 'val'):
     if bert is None:
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
@@ -288,7 +303,7 @@ def valid_bert(bert = None, split = 'val'):
     all_true_labels = []
     reversed_dict = reverse_indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
-        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
+        predicted_labels = decode_by_bert_keep_repeated(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
         true_labels = [label for label in bert_input.labels if label != -100]
         assert len(predicted_labels) == len(true_labels) == 5, "There should be exactly 5 predicted and true labels"
         predicted_labels = [reversed_dict.get(a, 5) for a in predicted_labels]
@@ -301,7 +316,8 @@ def valid_bert(bert = None, split = 'val'):
     # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
-def valid_bert_batched(bert = None, split = 'val', split_length = None, dataloader = None):
+# 保留重复标签的版本，直接选取每个位置得分最高的标签，可能会有重复标签，导致tau计算出错
+def valid_bert_batched_keep_repeated(bert = None, split = 'val', split_length = None, dataloader = None):
     if bert is None:
         bert = default_bert()
     bert.eval()
@@ -341,6 +357,103 @@ def valid_bert_batched(bert = None, split = 'val', split_length = None, dataload
     # _ = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
+
+# 匈牙利算法 2026.6.15
+def get_valid_permutation(model_outputs):
+    """
+    model_outputs: 模型的原始输出。
+    假设形状为 (5, 5)，即 5个句子，每个句子对应 5个位置的 logit 或 softmax 概率值。
+    model_outputs[i][j] 表示第 i 个句子填入位置 j (0-4) 的得分。
+    """
+    # 1. 转换为 numpy 数组
+    score_matrix = np.array(model_outputs)
+    
+    # 2. 因为 scipy 的 linear_sum_assignment 寻找的是完美匹配的“最小代价”
+    # 我们要找的是“最大得分”，所以将矩阵取负号，将其转化为求最小值问题
+    cost_matrix = -score_matrix
+    
+    # 3. 运行匈牙利算法
+    # row_ind 会是 [0, 1, 2, 3, 4] （句子的索引）
+    # col_ind 会是算法分配的、绝对不重复的 [p0, p1, p2, p3, p4] （位置的索引）
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    
+    # 4. col_ind 就是最终生成的无重复完美排列（0~4 映射）
+    # 如果你的评估代码需要 1~5 的标签，直接 + 1 即可
+    final_positions = col_ind + 1
+    
+    return final_positions
+
+
+# 使用匈牙利算法解码得到标签
+def valid_bert_batched(bert = None, split = 'val', split_length = None, dataloader = None):
+    if bert is None:
+        bert = default_bert()
+    bert.eval()
+    toker = default_tokenizer()
+    # 首先将val数据集转换成BertInput格式
+    # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
+    if dataloader is None:
+        paragraphs = sind_only_texts_get_by_split(split)
+        if split_length is not None:
+            common.print_once(f"只使用{split}前{split_length}个故事进行验证")
+            paragraphs = paragraphs[:split_length]
+        bert_inputs = sind_data_prepare(paragraphs)
+        dataloader = bert_inputs_to_dataloader_shuffle(bert_inputs)
+    # 然后使用默认的BERT模型进行解码，计算准确率和tau值
+    all_predicted_labels = []
+    all_true_labels = []
+    reversed_dict = reverse_indexs_tokenized()
+    index_dict = indexs_tokenized()
+    index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
+    for batch in tqdm(dataloader, desc="Validation"):
+        input_ids, attention_mask, label_ids = batch
+        input_ids = input_ids.to(DEVICE)
+        attention_mask = attention_mask.to(DEVICE)
+        with torch.no_grad():
+            logits = bert(input_ids=input_ids, attention_mask=attention_mask).logits # # [batch_size, 512, 30522]
+        # mask_token_index = (input_ids == toker.mask_token_id).nonzero(as_tuple=True)
+        for i in range(input_ids.size(0)): # 遍历batch中的每个样本
+            mask_token_bool = (input_ids[i] == toker.mask_token_id)
+            # predicted_token_ids = logits[i, mask_token_bool].argmax(axis=-1) # [5]
+            predicted_token_ids = logits[i, mask_token_bool] # [5, vocab_size]
+            predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
+            predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy()) # [5] 每个位置的最终标签（1-5）
+            true_label_ids = label_ids[i][label_ids[i] != -100] # [5]
+            assert len(predicted_token_ids) == len(true_label_ids) == 5, "There should be exactly 5 predicted and true labels"
+            # predicted_labels = [reversed_dict.get(a.item(), 5) for a in predicted_token_ids]
+            true_labels = [reversed_dict[b.item()] for b in true_label_ids]
+            all_predicted_labels.append(predicted_labels)
+            all_true_labels.append(true_labels)
+    # 在修正标签之前计算一次
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
+
+def valid_bert(bert = None, split = 'val'):
+    if bert is None:
+        bert = default_bert()
+    # 首先将val数据集转换成BertInput格式
+    # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
+    paragraphs = sind_only_texts_get_by_split(split)
+    bert_inputs = sind_data_prepare(paragraphs)
+    # 然后使用默认的BERT模型进行解码，计算准确率和tau值
+    all_predicted_labels = []
+    all_true_labels = []
+    reversed_dict = reverse_indexs_tokenized()
+    index_dict = indexs_tokenized()
+    for bert_input in tqdm(bert_inputs):
+        # NOTE: 这里使用匈牙利算法解码，得到无重复的标签序列，且直接就是1-5的标签，不需要再转换了
+        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
+        true_labels = [label for label in bert_input.labels if label != -100]
+        true_labels = [reversed_dict[b] for b in true_labels]
+        all_predicted_labels.append(predicted_labels)
+        all_true_labels.append(true_labels)
+    # 在修正标签之前计算一次
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
 
 def calculate_random_baseline(split):
     paragraphs = sind_only_texts_get_by_split(split)

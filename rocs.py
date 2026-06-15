@@ -3,7 +3,8 @@ import os
 import common
 import random
 from functools import lru_cache
-from sind import sind_data_prepare, bert_inputs_to_dataloader_shuffle, train
+from sind import sind_data_prepare, bert_inputs_to_dataloader_shuffle, train, default_bert, default_tokenizer, cal_tau_acc_pmr, load_checkpoint
+from sind import valid_bert_batched
 
 @lru_cache(maxsize=1)
 def mixed_dataset_get():
@@ -49,3 +50,11 @@ def train_rocs():
 
 if __name__ == '__main__':
     train_rocs()
+
+
+def test_trained():
+    bert = default_bert()
+    load_checkpoint(bert, './checkpoints/SIND_best_20260612_175823_366716_rocs_best_acc.pth' )
+    # valid_bert(bert, 'test')
+    dataloader = test_dataloader_provider()
+    valid_bert_batched(bert, dataloader = dataloader)
