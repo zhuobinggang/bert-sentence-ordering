@@ -1,0 +1,112 @@
+# 解码一次之后重新排序，再解码一次，看看能不能提升性能
+from sind import *
+import numpy as np
+
+# 使用匈牙利算法解码得到标签
+def decode_by_bert(input_ids, attention_mask, bert=None):
+    toker = default_tokenizer()
+    if bert is None:
+        bert = default_bert()
+    input_ids = torch.tensor([input_ids]).to(DEVICE)
+    attention_mask = torch.tensor([attention_mask]).to(DEVICE)
+    with torch.no_grad():
+        logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
+    mask_token_bool = (input_ids == toker.mask_token_id)
+    predicted_token_ids = logits[mask_token_bool]  # [5, vocab_size]
+    index_dict = indexs_tokenized()
+    index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
+    predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
+    predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy())
+    assert len(predicted_labels) == 5, "There should be exactly 5 predicted token ids"
+    return predicted_labels.tolist()
+
+
+def valid_bert_two_pass(bert = None, split = 'val'):
+    if bert is None:
+        bert = default_bert()
+    # 首先将val数据集转换成BertInput格式
+    # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
+    paragraphs = sind_only_texts_get_by_split(split)
+    bert_inputs = sind_data_prepare(paragraphs)
+    # 然后使用默认的BERT模型进行解码，计算准确率和tau值
+    all_predicted_labels = []
+    all_true_labels = []
+    reversed_dict = reverse_indexs_tokenized()
+    index_dict = indexs_tokenized()
+    for bert_input in tqdm(bert_inputs):
+        # NOTE: 这里使用匈牙利算法解码，得到无重复的标签序列，且直接就是1-5的标签，不需要再转换了
+        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
+        true_labels = [label for label in bert_input.labels if label != -100]
+        true_labels = [reversed_dict[b] for b in true_labels]
+        all_predicted_labels.append(predicted_labels)
+        all_true_labels.append(true_labels)
+    # 在修正标签之前计算一次
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    # print("Now fixing predicted labels and recalculating metrics...")
+    # _ = cal_tau_acc(all_predicted_labels, all_true_labels, need_fix = True)
+    return test_result
+
+
+def input_ids_to_slices(input_ids):
+    toker = default_tokenizer()
+    mask_token_indices = [i for i, token_id in enumerate(input_ids) if token_id == toker.mask_token_id]
+    slices = []
+    slice = []
+    for i, idx in enumerate(input_ids):
+        if idx == toker.sep_token_id:
+            break
+        if i + 1 in mask_token_indices:
+            slices.append(slice)
+            slice = []
+        slice.append(idx)
+    slices.append(slice)
+    slices.append([toker.sep_token_id])
+    return slices
+
+
+# [CLS]
+# ( [MASK] ) sentence five.
+# ( [MASK] ) sentence one.
+# ( [MASK] ) sentence two.
+# ( [MASK] ) sentence three.
+# ( [MASK] ) sentence four.
+# [SEP]
+def test_input_ids_to_slices():
+    paragraph = ["Sentence one.", "Sentence two.", "Sentence three.", "Sentence four.", "Sentence five."]
+    bert_input = sind_data_prepare([paragraph])[0]
+    ss = input_ids_to_slices(bert_input.input_ids)
+    for s in ss:
+        print(default_tokenizer().decode(s))
+
+
+def resort_token_ids(input_ids, predicted_labels_org):
+    predicted_labels = predicted_labels_org.copy()
+    assert min(predicted_labels) >= 1 and max(predicted_labels) <= 5, "Predicted labels should be in the range of 1 to 5"
+    slices = input_ids_to_slices(input_ids)
+    slice_cls = slices[0]
+    slice_sep = slices[-1]
+    sentence_slices = slices[1:-1]
+    # 根据predicted_labels重新排序sentence_slices
+    predicted_labels = [label - 1 for label in predicted_labels] # 转换为0-4的索引
+    sorted_sentence_slices = [None] * 5
+    for i, label in enumerate(predicted_labels):
+        sorted_sentence_slices[label] = sentence_slices[i]
+    # 将重新排序后的切片拼接成新的input_ids
+    new_input_ids = slice_cls
+    for s in sorted_sentence_slices:
+        new_input_ids += s
+    new_input_ids += slice_sep
+    # 如果需要重新pad的话
+    toker = default_tokenizer()
+    if toker.pad_token_id in input_ids:
+        new_input_ids += [toker.pad_token_id] * (len(input_ids) - len(new_input_ids)) # padding
+    return new_input_ids
+
+# Tested 2026.6.15
+def test_resort_token_ids():
+    paragraph = ["Sentence one.", "Sentence two.", "Sentence three.", "Sentence four.", "Sentence five."]
+    bert_input = sind_data_prepare([paragraph])[0]
+    print(default_tokenizer().decode(bert_input.input_ids))
+    predicted_labels = [5, 4, 3, 2, 1] # 假设模型预测的标签是这样的
+    new_input_ids = resort_token_ids(bert_input.input_ids, predicted_labels)
+    print(default_tokenizer().decode(new_input_ids))
