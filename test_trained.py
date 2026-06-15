@@ -2,7 +2,7 @@ from sind import *
 
 def run():
     bert = default_bert()
-    load_checkpoint(bert, './checkpoints/SIND_best_e0.pth' )
+    load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
     # valid_bert(bert, 'test')
     valid_bert_batched(bert, 'test')
 

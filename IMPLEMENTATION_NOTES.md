@@ -45,7 +45,7 @@ from multi_step_decode import multi_step_decode
 from reader import default_bert, load_checkpoint
 
 bert = default_bert()
-load_checkpoint(bert, './checkpoints/SIND_best_e0.pth')
+load_checkpoint(bert, './checkpoints/SIND_best_e1.pth')
 
 # 获取模型预测
 predictions = multi_step_decode(input_ids, attention_mask, bert)
@@ -85,6 +85,6 @@ result = valid_bert_multi_step(bert, split='test')
 ```python
 if __name__ == '__main__':
     bert = default_bert()
-    load_checkpoint(bert, './checkpoints/SIND_best_e0.pth')
+    load_checkpoint(bert, './checkpoints/SIND_best_e1.pth')
     result = valid_bert_multi_step(bert, 'test')
 ```
