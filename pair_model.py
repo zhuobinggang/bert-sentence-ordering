@@ -46,9 +46,10 @@ class PairLossBertV2(PairLossBert):
         return avg_accuracy
     
 @torch.no_grad()
-def test_trained_for_pair():
+def test_trained_for_pair(the_path = ''):
     model = PairLossBertV2()
-    load_checkpoint(model, './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth')
+    the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
+    load_checkpoint(model, the_path)
     model.to(DEVICE)
     model.eval()
     val_dataloader = default_test_dataloader_provider()
