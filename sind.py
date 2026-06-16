@@ -94,13 +94,14 @@ def paragraph_prefix_suffix_with_instruct():
 def add_one(lst):
     return [x + 1 for x in lst]
 
-def shuffle_paragraph(paragraph, need_add_one = True):
+def shuffle_paragraph(paragraph, need_add_one = True, need_shuffle = True):
     indexs = list(range(len(paragraph)))
     # NOTE: 标签从1开始
     if need_add_one:
         indexs = add_one(indexs)
     index_sentence_pairs = list(zip(indexs, paragraph))
-    random.shuffle(index_sentence_pairs)
+    if need_shuffle:
+        random.shuffle(index_sentence_pairs)
     indexs, paragraph = zip(*index_sentence_pairs)
     return list(indexs), list(paragraph)
 
@@ -175,16 +176,16 @@ def create_bert_input_for_shuffled_paragraph(paragraph, indexs, MAX_SENTENCE_IDS
     bert_input = BertInput(input_ids=token_ids, attention_mask=attention_mask, labels=label_ids)
     return bert_input
 
-def sind_data_prepare(paragraphs, random_mask_count = 5):
+def sind_data_prepare(paragraphs, random_mask_count = 5, need_shuffle = True):
     results = []
     # 最大句子长度，超过这个长度的句子将被截断
     MAX_SENTENCE_IDS = 96 
     # 段落前缀和后缀
     paragraph_prefix_suffix_provider = paragraph_prefix_suffix_with_instruct if common.args.instruction else default_paragraph_prefix_and_suffix
     for paragraph in paragraphs:
-        assert len(paragraph) == 5, "Each story should have 5 sentences"
+        # assert len(paragraph) == 5, "Each story should have 5 sentences"
         # 打乱句子和标签
-        indexs, paragraph = shuffle_paragraph(paragraph, need_add_one = True) # 标签从1开始
+        indexs, paragraph = shuffle_paragraph(paragraph, need_add_one = True, need_shuffle = need_shuffle) # 标签从1开始
         # 生成BertInput
         bert_input = create_bert_input_for_shuffled_paragraph(paragraph, indexs, MAX_SENTENCE_IDS, paragraph_prefix_suffix_provider=paragraph_prefix_suffix_provider, random_mask_count=random_mask_count)
         results.append(bert_input)
@@ -508,7 +509,10 @@ def default_val_dataloader_provider():
     print('重新制备验证数据集...')
     return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
 
-def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dataloader_provider, val_dataloader_provider = default_val_dataloader_provider):
+def train(epochs = 5, suffix = '', 
+          trian_dataloader_provider = default_trian_dataloader_provider, 
+          val_dataloader_provider = default_val_dataloader_provider,
+          model = None):
     # 准备valid数据集并固定
     val_dataloader = val_dataloader_provider()
     # 记录日志
@@ -518,9 +522,18 @@ def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dat
     from accelerate import Accelerator
     accelerator = Accelerator()
     # model.cuda()
-    model = default_bert()
-    model.train()
-    optimizer = optim.AdamW(model.parameters(), lr=5e-5)
+    if model is None:
+        model = default_bert()
+        model.train()
+        optimizer = optim.AdamW(model.parameters(), lr=5e-5)
+    else:
+        print('使用传入的模型进行训练...')
+        assert hasattr(model, 'pair_classifier'), "传入的模型必须包含pair_classifier属性"
+        optimizer_groups = [
+            {"params": model.bert.parameters(), "lr": 5e-5},  
+            {"params": model.pair_classifier.parameters(), "lr": 5e-3} 
+        ]
+        optimizer = optim.AdamW(optimizer_groups)
     model, optimizer = accelerator.prepare(
         model, optimizer
     )
@@ -540,13 +553,19 @@ def train(epochs = 5, suffix = '', trian_dataloader_provider = default_trian_dat
             loss = outputs.loss
             accelerator.backward(loss)
             writer.add_scalar(f'Loss', loss.item(), writer.global_step)
+            if hasattr(model, 'pair_classifier'):
+                writer.add_scalar(f'Pair_Loss', outputs.pair_loss, writer.global_step)
             writer.global_step += 1
             optimizer.step()
             optimizer.zero_grad()
             steps += 1
             if steps % 1000 == 0:
                 model.eval()
-                score = valid_bert_batched(model, dataloader=val_dataloader)
+                if hasattr(model, 'pair_classifier'):
+                    common.print_once("aux模型, 使用model.bert进行验证")
+                    score = valid_bert_batched(model.bert, dataloader=val_dataloader)
+                else:
+                    score = valid_bert_batched(model, dataloader=val_dataloader)
                 model.train()
                 print(f'{steps}检验模型，当前验证结果: {score}')
                 if score.acc > MAX_ACC:
