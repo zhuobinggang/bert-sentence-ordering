@@ -58,3 +58,10 @@ def test_trained():
     # valid_bert(bert, 'test')
     dataloader = test_dataloader_provider()
     valid_bert_batched(bert, dataloader = dataloader)
+
+def test_two_pass():
+    from two_pass_decode import valid_bert_two_pass
+    bert = default_bert()
+    load_checkpoint(bert, './checkpoints/SIND_best_20260612_175823_366716_rocs_best_acc.pth' )
+    bert_inputs = sind_data_prepare(dataset_get()[2])
+    valid_bert_two_pass(bert, None, bert_inputs)

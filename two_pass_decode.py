@@ -33,18 +33,18 @@ def print_only_once(input_ids, labels, predicted_labels, new_input_ids, new_labe
         print(f'New predicted labels after second pass: {new_predicted_labels}')
         print_only_once.has_printed = True
 
-def valid_bert_two_pass(bert = None, split = 'val'):
+def valid_bert_two_pass(bert = None, split = 'val', bert_inputs = None):
     if bert is None:
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
-    bert_inputs = sind_data_prepare(paragraphs)
+    if bert_inputs is None:
+        paragraphs = sind_only_texts_get_by_split(split)
+        bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
     all_true_labels = []
     reversed_dict = reverse_indexs_tokenized()
-    index_dict = indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
         # NOTE: 这里使用匈牙利算法解码，得到无重复的标签序列，且直接就是1-5的标签，不需要再转换了
         predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) 
