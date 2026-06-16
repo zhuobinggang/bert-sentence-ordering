@@ -71,12 +71,12 @@ class PairLossBertV2(PairLossBert):
                 pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
                 score = self.pair_classifier(pair_emb) # size: [1]
                 score_matrix[idx1][idx2] = score.item()
-            print("score_matrix:\n", score_matrix)
+            # print("score_matrix:\n", score_matrix)
             # best_order = get_best_order_by_enumeration(score_matrix)
             best_order = get_best_order_by_enumeration_v2(score_matrix)
             best_order = add_one(best_order) # 将0-4的索引转换成1-5的标签
-            print("best_order:", best_order)
-            print("labels:", labels_batch)
+            # print("best_order:", best_order)
+            # print("labels:", labels_batch)
             taus.append(cal_tau(best_order, labels_batch))
             accs.append(cal_acc(best_order, labels_batch))
             pmrs.append(cal_PMR(best_order, labels_batch))
