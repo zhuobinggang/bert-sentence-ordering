@@ -7,6 +7,7 @@ from recordclass import recordclass
 from tqdm import tqdm
 
 PairLossBertResult = recordclass('PairLossBertResult', 'loss decode_loss pair_loss')
+DOUBLE_CHECK = True # 是否开启训练时的双重检查，反过来训练一次，增加训练信号
 
 def print_only_once(*args, input_ids=None):
     if not hasattr(print_only_once, "has_printed"):
@@ -55,10 +56,11 @@ class PairLossBert(nn.Module):
             # print(score.item())
             print_only_once(labels_batch, idx1, idx2, label1, label2, pair_label, score.item(), input_ids = input_ids[batch])
             square_loss = (score - pair_label) ** 2
-            # 反过来也训练一次
-            pair_emb_reverse = torch.cat([mask_embs[idx2], mask_embs[idx1]], dim=-1) # size: [hidden_size * 2]
-            score_reverse = self.pair_classifier(pair_emb_reverse) # size: [1]
-            square_loss += (score_reverse - (1 - pair_label)) ** 2
+            if DOUBLE_CHECK:
+                # 反过来也训练一次
+                pair_emb_reverse = torch.cat([mask_embs[idx2], mask_embs[idx1]], dim=-1) # size: [hidden_size * 2]
+                score_reverse = self.pair_classifier(pair_emb_reverse) # size: [1]
+                square_loss += (score_reverse - (1 - pair_label)) ** 2
             classification_loss += square_loss
         classification_loss = classification_loss / last_hidden_state.size(0) # 平均每个batch的损失
         loss = decode_loss + classification_loss
@@ -128,7 +130,7 @@ class PairLossBert(nn.Module):
 def train_pair_loss_bert():
     model = PairLossBert()
     model.to(DEVICE)
-    train(epochs=5, model=model, suffix='pair_loss_bert')
+    train(epochs=5, model=model, suffix='_pair_loss_bertx2')
 
 def test_trained_for_pair():
     model = PairLossBert()
