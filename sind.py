@@ -573,7 +573,11 @@ def train(epochs = 5, suffix = '',
                     MAX_ACC = score.acc
                     save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     model.eval()
-    score = valid_bert_batched(model, dataloader=val_dataloader)
+    if hasattr(model, 'pair_classifier'):
+        common.print_once("aux模型, 使用model.bert进行验证")
+        score = valid_bert_batched(model.bert, dataloader=val_dataloader)
+    else:
+        score = valid_bert_batched(model, dataloader=val_dataloader)
     model.train()
     print(f'最后一次检验模型，当前验证结果: {score}')
     if score.acc > MAX_ACC:
