@@ -28,6 +28,9 @@ class PairLossBert(nn.Module):
             nn.Sigmoid()
         )
 
+    def pair_embedding(self, emb1, emb2):
+        return torch.cat([emb1, emb2], dim=-1)
+
     def forward(self, input_ids, attention_mask, labels):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True, labels=labels)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
         decode_loss = outputs.loss
@@ -51,14 +54,14 @@ class PairLossBert(nn.Module):
             # print(label1, label2)
             pair_label = 1 if label1 < label2 else 0 # 如果label1在label2前面，标签为1，否则为0
             # print(pair_label)
-            pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
+            pair_emb = self.pair_embedding(mask_embs[idx1], mask_embs[idx2]) # size: [hidden_size * 2]
             score = self.pair_classifier(pair_emb) # size: [1]
             # print(score.item())
             print_only_once(labels_batch, idx1, idx2, label1, label2, pair_label, score.item(), input_ids = input_ids[batch])
             square_loss = (score - pair_label) ** 2
             if DOUBLE_CHECK:
                 # 反过来也训练一次
-                pair_emb_reverse = torch.cat([mask_embs[idx2], mask_embs[idx1]], dim=-1) # size: [hidden_size * 2]
+                pair_emb_reverse = self.pair_embedding(mask_embs[idx2], mask_embs[idx1]) # size: [hidden_size * 2]
                 score_reverse = self.pair_classifier(pair_emb_reverse) # size: [1]
                 square_loss += (score_reverse - (1 - pair_label)) ** 2
             classification_loss += square_loss
@@ -88,7 +91,7 @@ class PairLossBert(nn.Module):
             # print(label1, label2)
             pair_label = 1 if label1 < label2 else 0 # 如果label1在label2前面，标签为1，否则为0
             # print(pair_label)
-            pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
+            pair_emb = self.pair_embedding(mask_embs[idx1], mask_embs[idx2]) # size: [hidden_size * 2]
             score = self.pair_classifier(pair_emb) # size: [1]
             if abs(score.item() - pair_label) < 0.5:
                 # print_only_once(labels_batch, idx1, idx2, label1, label2, pair_label, score.item(), input_ids = input_ids[batch])
@@ -107,7 +110,7 @@ class PairLossBert(nn.Module):
         mask_token_bool = (input_ids == default_tokenizer().mask_token_id) # [seq_len]
         mask_indices = torch.where(mask_token_bool)[0] # [num_masks]
         mask_embs = last_hidden_state[0][mask_indices] # [num_masks, hidden_size]
-        pair_emb = torch.cat([mask_embs[0], mask_embs[1]], dim=-1) # size: [hidden_size * 2]
+        pair_emb = self.pair_embedding(mask_embs[0], mask_embs[1]) # size: [hidden_size * 2]
         score = self.pair_classifier(pair_emb) # size: [1]
         return score.item() # 返回前后关系的概率，越接近1表示s1在s2前面，越接近0表示s2在s1前面
     
@@ -121,7 +124,7 @@ class PairLossBert(nn.Module):
         mask_token_bool = (input_ids == default_tokenizer().mask_token_id) # [seq_len]
         mask_indices = torch.where(mask_token_bool)[0] # [num_masks]
         mask_embs = last_hidden_state[0][mask_indices] # [num_masks, hidden_size]
-        pair_emb = torch.cat([mask_embs[0], mask_embs[1]], dim=-1) # size: [hidden_size * 2]
+        pair_emb = self.pair_embedding(mask_embs[0], mask_embs[1]) # size: [hidden_size * 2]
         score = self.pair_classifier(pair_emb) # size: [1]
         square_loss = (score - label) ** 2
         return square_loss

@@ -1,0 +1,40 @@
+# 使用sentence-bert的拼装方法
+from pair_model import *
+
+DOUBLE_CHECK = False
+
+class PairLossSentenceBERT(PairLossBertV2):
+    def pair_embedding(self, emb1, emb2):
+        return torch.cat([emb1, emb2, torch.abs(emb1 - emb2), emb1 * emb2], dim=-1)
+    
+
+def train_pair_loss_sentence_bert():
+    model = PairLossSentenceBERT()
+    model.to(DEVICE)
+    train(epochs=5, model=model, suffix='_pair_loss_sentence_bert')
+
+def test_trained():
+    logger = common.get_logger(__name__)
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    search_string = '_pair_loss_sentence_bert'
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    val_dataloader = default_test_dataloader_provider()
+    for file in matching_files:
+        model = PairLossSentenceBERT()
+        # the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
+        load_checkpoint(model, str(file))
+        model.to(DEVICE)
+        model.eval()
+        # print(f'Testing model from checkpoint: {file}')
+        scores = valid_batched(model, dataloader=val_dataloader)
+        print(f'Model: {file}, Test Scores: {scores}')
+        logger.warning(f'Model: {file}, Test Scores: {scores}')
+
+def train_and_test():
+    train_pair_loss_sentence_bert()
+    test_trained()
+
+
+if __name__ == "__main__":
+    train_and_test()

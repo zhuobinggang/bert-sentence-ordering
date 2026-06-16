@@ -1,4 +1,4 @@
 #!/bin/bash
 #PBS -k doe -j oe
 source /work/zb023/research/bert-sentence-ordering/scripts/hpc_common.sh
-TQDM_DISABLE=1 python3 pair_model2.py
+TQDM_DISABLE=1 python3 pair_model3.py

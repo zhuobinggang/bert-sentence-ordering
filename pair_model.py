@@ -10,7 +10,6 @@ import numpy as np
 def get_all_index_pairs(lst):
     pairs = []
     for idx1, idx2 in permutations(range(len(lst)), 2):
-        # pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
         pairs.append((idx1, idx2))
     return pairs
 
@@ -55,7 +54,7 @@ class PairLossBertV2(PairLossBert):
                 # print(label1, label2)
                 pair_label = 1 if label1 < label2 else 0 # 如果label1在label2前面，标签为1，否则为0
                 # print(pair_label)
-                pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
+                pair_emb = self.pair_embedding(mask_embs[idx1], mask_embs[idx2]) # size: [hidden_size * 2]
                 score = self.pair_classifier(pair_emb) # size: [1]
                 if abs(score.item() - pair_label) < 0.5:
                     # print_only_once(labels_batch, idx1, idx2, label1, label2, pair_label, score.item(), input_ids = input_ids[batch])
@@ -84,7 +83,7 @@ class PairLossBertV2(PairLossBert):
             mask_embs = last_hidden_state[batch][mask_bool_batch] # [num_masks, hidden_size]
             for idx1, idx2 in get_all_index_pairs(mask_indices):
                 # print(pair_label)
-                pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
+                pair_emb = self.pair_embedding(mask_embs[idx1], mask_embs[idx2]) # size: [hidden_size * 2]
                 score = self.pair_classifier(pair_emb) # size: [1]
                 score_matrix[idx1][idx2] = score.item()
             # print("score_matrix:\n", score_matrix)
