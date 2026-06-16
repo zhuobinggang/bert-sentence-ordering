@@ -1,6 +1,6 @@
 # 使用[MASK]向量来判断句子对的前后关系
 from bert_utils import DEVICE, default_bert, default_tokenizer, reverse_indexs_tokenized
-from sind import sind_data_prepare, train, load_checkpoint, default_val_dataloader_provider
+from sind import sind_data_prepare, train, load_checkpoint, default_val_dataloader_provider, valid_bert_batched, default_test_dataloader_provider
 from torch import nn
 import torch
 from recordclass import recordclass
@@ -55,6 +55,10 @@ class PairLossBert(nn.Module):
             # print(score.item())
             print_only_once(labels_batch, idx1, idx2, label1, label2, pair_label, score.item(), input_ids = input_ids[batch])
             square_loss = (score - pair_label) ** 2
+            # 反过来也训练一次
+            pair_emb_reverse = torch.cat([mask_embs[idx2], mask_embs[idx1]], dim=-1) # size: [hidden_size * 2]
+            score_reverse = self.pair_classifier(pair_emb_reverse) # size: [1]
+            square_loss += (score_reverse - (1 - pair_label)) ** 2
             classification_loss += square_loss
         classification_loss = classification_loss / last_hidden_state.size(0) # 平均每个batch的损失
         loss = decode_loss + classification_loss
@@ -90,8 +94,6 @@ class PairLossBert(nn.Module):
         avg_accuracy = avg_accuracy / last_hidden_state.size(0) # 平均每个
         return avg_accuracy
     
-
-
     def predict_pair_order(self, s1, s2):
         # 输入两个句子，判断它们的前后关系，返回s1在s2前面的概率
         bert_input = sind_data_prepare([[s1, s2]], need_shuffle=False)[0]
@@ -156,3 +158,10 @@ def test_trained_for_pair():
         avg_acc += acc
     avg_acc = avg_acc / len(val_dataloader)
     print(f"Average pair order accuracy in validation set: {avg_acc:.4f}")
+
+def test_trained():
+    model = PairLossBert()
+    load_checkpoint(model, './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth')
+    model.to(DEVICE)
+    model.eval()
+    valid_bert_batched(model.bert, split='test')

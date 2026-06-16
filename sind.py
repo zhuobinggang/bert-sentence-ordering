@@ -509,6 +509,11 @@ def default_val_dataloader_provider():
     print('重新制备验证数据集...')
     return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
 
+@lru_cache(maxsize=1) # 只缓存验证数据集，训练数据集每次都重新制备，增加随机性
+def default_test_dataloader_provider():
+    print('重新制备测试数据集...')
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('test')))
+
 def train(epochs = 5, suffix = '', 
           trian_dataloader_provider = default_trian_dataloader_provider, 
           val_dataloader_provider = default_val_dataloader_provider,
