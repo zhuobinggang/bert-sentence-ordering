@@ -71,8 +71,12 @@ class PairLossBertV2(PairLossBert):
                 pair_emb = torch.cat([mask_embs[idx1], mask_embs[idx2]], dim=-1) # size: [hidden_size * 2]
                 score = self.pair_classifier(pair_emb) # size: [1]
                 score_matrix[idx1][idx2] = score.item()
-            best_order = get_best_order_by_enumeration(score_matrix)
+            print("score_matrix:\n", score_matrix)
+            # best_order = get_best_order_by_enumeration(score_matrix)
+            best_order = get_best_order_by_enumeration_v2(score_matrix)
             best_order = add_one(best_order) # 将0-4的索引转换成1-5的标签
+            print("best_order:", best_order)
+            print("labels:", labels_batch)
             taus.append(cal_tau(best_order, labels_batch))
             accs.append(cal_acc(best_order, labels_batch))
             pmrs.append(cal_PMR(best_order, labels_batch))
@@ -143,6 +147,43 @@ def get_best_order_by_enumeration(prob_matrix):
             
     return list(best_perm)
 
+
+
+def get_best_order_by_enumeration_v2(prob_matrix):
+    """
+    通过穷举 5! = 120 种全排列，寻找全局两两关系总分最高的最佳句子顺序。
+    
+    参数:
+    prob_matrix (list of list): 5x5 的二维列表，matrix[i][j] 表示第 i 个句子在第 j 个句子前面的概率。
+    
+    返回:
+    list: 使得全局概率对数和最大的句子索引排列。
+    """
+    n = len(prob_matrix)
+    best_score = 0
+    best_perm = None
+
+        # 1. 穷举所有可能的排列组合（对于 5 个句子，一共 120 种）
+    for perm in itertools.permutations(range(n)):
+        current_likelihood = 0.0
+        
+        # 2. 计算当前排列顺序下的全局总得分
+        # perm 的结构类似于 (2, 0, 1, 4, 3)，代表句子的先后顺序
+        for a in range(n-1):
+            b = a + 1
+            # 在当前假设的顺序中，句子 i 排在句子 j 的前面
+            i = perm[a]
+            j = perm[b]
+            # 累加对数概率：模型认为 i 确实应该在 j 前面的概率
+            # 使用 log 可以让概率相乘变成得分相加，数学上更严谨
+            current_likelihood += prob_matrix[i][j]
+                
+        # 3. 寻找使全局联合概率最大的那个排列
+        if current_likelihood > best_score:
+            best_score = current_likelihood
+            best_perm = perm
+            
+    return list(best_perm)
 
 # 使用句子对排序头来预测句子对前后关系，然后组合成最终的排序结果，计算准确率和tau值
 def valid_batched(model = None, split = 'val', split_length = None, dataloader = None):
