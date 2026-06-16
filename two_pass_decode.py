@@ -21,6 +21,18 @@ def decode_by_bert(input_ids, attention_mask, bert=None):
     return predicted_labels.tolist()
 
 
+def print_only_once(input_ids, labels, predicted_labels, new_input_ids, new_labels, new_predicted_labels):
+    if not hasattr(print_only_once, "has_printed"):
+        input_ids = [x for x in input_ids if x != default_tokenizer().pad_token_id]
+        print(f'Original input_ids: {default_tokenizer().decode(input_ids)}')
+        print(f'Original predicted labels: {predicted_labels}')
+        print(f'Original true labels: {labels}')
+        new_input_ids = [x for x in new_input_ids if x != default_tokenizer().pad_token_id]
+        print(f'New input_ids after resorting: {default_tokenizer().decode(new_input_ids)}')
+        print(f'New true labels after resorting: {new_labels}')
+        print(f'New predicted labels after second pass: {new_predicted_labels}')
+        print_only_once.has_printed = True
+
 def valid_bert_two_pass(bert = None, split = 'val'):
     if bert is None:
         bert = default_bert()
@@ -35,11 +47,25 @@ def valid_bert_two_pass(bert = None, split = 'val'):
     index_dict = indexs_tokenized()
     for bert_input in tqdm(bert_inputs):
         # NOTE: 这里使用匈牙利算法解码，得到无重复的标签序列，且直接就是1-5的标签，不需要再转换了
-        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) # 注意要传递attention_mask
+        predicted_labels = decode_by_bert(bert_input.input_ids, bert_input.attention_mask, bert) 
         true_labels = [label for label in bert_input.labels if label != -100]
         true_labels = [reversed_dict[b] for b in true_labels]
-        all_predicted_labels.append(predicted_labels)
-        all_true_labels.append(true_labels)
+        # 根据预测的标签重排true_labels
+        new_true_labels = [0] * 5
+        for i, label in enumerate(predicted_labels):
+            new_true_labels[label - 1] = true_labels[i]
+        # 二次解码
+        # 重排input_ids
+        new_input_ids = resort_token_ids(bert_input.input_ids, predicted_labels)
+        new_predicted_labels = decode_by_bert(new_input_ids, bert_input.attention_mask, bert) 
+        if new_predicted_labels != predicted_labels:
+            if hasattr(valid_bert_two_pass, "resorted_count"):
+                valid_bert_two_pass.resorted_count += 1
+            else:
+                valid_bert_two_pass.resorted_count = 1
+        print_only_once(bert_input.input_ids, true_labels, predicted_labels, new_input_ids, new_true_labels, new_predicted_labels)
+        all_predicted_labels.append(new_predicted_labels)
+        all_true_labels.append(new_true_labels)
     # 在修正标签之前计算一次
     test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
     # print("Now fixing predicted labels and recalculating metrics...")
@@ -110,3 +136,11 @@ def test_resort_token_ids():
     predicted_labels = [5, 4, 3, 2, 1] # 假设模型预测的标签是这样的
     new_input_ids = resort_token_ids(bert_input.input_ids, predicted_labels)
     print(default_tokenizer().decode(new_input_ids))
+
+
+def test_valid_bert_two_pass():
+    bert = default_bert()
+    load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
+    # valid_bert(bert, 'test')
+    valid_bert_two_pass(bert, 'test')
+    print(f"Number of samples that were resorted: {getattr(valid_bert_two_pass, 'resorted_count', 0)}")
