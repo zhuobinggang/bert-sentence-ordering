@@ -14,6 +14,22 @@ def get_all_index_pairs(lst):
         pairs.append((idx1, idx2))
     return pairs
 
+def transform_to_label_format(best_order):
+    """
+    将 [2, 4, 3, 5, 1] (位置->句子ID) 
+    转换为 [5, 1, 3, 2, 4] (句子ID->位置)
+    """
+    # 初始化一个长度为 5 的标准标签列表
+    converted_pred = [0] * len(best_order)
+    
+    # best_order 里面是 1-indexed 的句子ID
+    for position_idx, sentence_id in enumerate(best_order):
+        # position_idx 是 0~4，对应的位置数字是 position_idx + 1
+        # sentence_id 是 1~5，对应的索引是 sentence_id - 1
+        converted_pred[sentence_id - 1] = position_idx + 1
+        
+    return converted_pred
+
 # 先检查所有MASK对的预测结果
 class PairLossBertV2(PairLossBert):
     def predict_pair_order_in_paragraph(self, input_ids, attention_mask, labels):
@@ -72,9 +88,10 @@ class PairLossBertV2(PairLossBert):
                 score = self.pair_classifier(pair_emb) # size: [1]
                 score_matrix[idx1][idx2] = score.item()
             # print("score_matrix:\n", score_matrix)
-            # best_order = get_best_order_by_enumeration(score_matrix)
-            best_order = get_best_order_by_enumeration_v2(score_matrix)
+            best_order = get_best_order_by_enumeration(score_matrix)
+            # best_order = get_best_order_by_enumeration_v2(score_matrix)
             best_order = add_one(best_order) # 将0-4的索引转换成1-5的标签
+            best_order = transform_to_label_format(best_order) # 将位置->句子ID的格式转换成句子ID->位置的格式
             # print("best_order:", best_order)
             # print("labels:", labels_batch)
             taus.append(cal_tau(best_order, labels_batch))
