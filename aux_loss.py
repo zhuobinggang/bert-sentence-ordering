@@ -22,6 +22,9 @@ class PairLossBert(nn.Module):
         if bert is None:
             bert = default_bert()
         self.bert = bert
+        self.init_pair_classifier()
+
+    def init_pair_classifier(self):
         # linear一个线性层接一个sigmoid层，1代表前后关系正确，0代表前后关系错误
         self.pair_classifier = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size * 2, 1),

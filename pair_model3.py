@@ -4,6 +4,13 @@ from pair_model import *
 DOUBLE_CHECK = False
 
 class PairLossSentenceBERT(PairLossBertV2):
+    def init_pair_classifier(self):
+        # linear一个线性层接一个sigmoid层，1代表前后关系正确，0代表前后关系错误
+        self.pair_classifier = nn.Sequential(
+            nn.Linear(self.bert.config.hidden_size * 4, 1),
+            nn.Sigmoid()
+        )
+
     def pair_embedding(self, emb1, emb2):
         return torch.cat([emb1, emb2, torch.abs(emb1 - emb2), emb1 * emb2], dim=-1)
     
