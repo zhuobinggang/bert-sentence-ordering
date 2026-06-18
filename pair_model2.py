@@ -50,7 +50,7 @@ def train_pair_loss_bert():
     train(epochs=5, model=model, suffix='_pair_loss_bert_womlm')
 
 def test_trained():
-    logger = common.get_logger(__name__)
+    logger = common.logging.getLogger(__name__)
     from pathlib import Path
     directory_path = Path("./checkpoints")
     search_string = '_pair_loss_bert_womlm'
