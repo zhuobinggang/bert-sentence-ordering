@@ -2,24 +2,6 @@
 from sind import *
 import numpy as np
 
-# 使用匈牙利算法解码得到标签
-def decode_by_bert(input_ids, attention_mask, bert=None):
-    toker = default_tokenizer()
-    if bert is None:
-        bert = default_bert()
-    input_ids = torch.tensor([input_ids]).to(DEVICE)
-    attention_mask = torch.tensor([attention_mask]).to(DEVICE)
-    with torch.no_grad():
-        logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
-    mask_token_bool = (input_ids == toker.mask_token_id)
-    predicted_token_ids = logits[mask_token_bool]  # [5, vocab_size]
-    index_dict = indexs_tokenized()
-    index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
-    predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
-    predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy())
-    assert len(predicted_labels) == 5, "There should be exactly 5 predicted token ids"
-    return predicted_labels.tolist()
-
 
 def print_only_once(input_ids, labels, predicted_labels, new_input_ids, new_labels, new_predicted_labels):
     if not hasattr(print_only_once, "has_printed"):

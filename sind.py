@@ -574,7 +574,7 @@ def train(epochs = 5, suffix = '',
                 model.train()
                 print(f'{steps}检验模型，当前验证结果: {score}')
                 if score.acc > MAX_ACC:
-                    print('保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
+                    print(f'保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
                     MAX_ACC = score.acc
                     save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     model.eval()
@@ -586,7 +586,7 @@ def train(epochs = 5, suffix = '',
     model.train()
     print(f'最后一次检验模型，当前验证结果: {score}')
     if score.acc > MAX_ACC:
-        print('保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
+        print(f'保存模型，当前准确率提升到{score.acc}，之前的最高准确率是{MAX_ACC}')
         MAX_ACC = score.acc
         save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_acc')
     return model

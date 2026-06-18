@@ -1,34 +1,33 @@
-# 使用sentence-bert的拼装方法
-from pair_model import *
+# 使用sentence-bert的拼装方法，然后加深分类头深度
+from pair_model3 import *
 
 DOUBLE_CHECK = False
 
-class PairLossSentenceBERT(PairLossBertV2):
+class PairLossSentenceBERTDeep(PairLossSentenceBERT):
     def init_pair_classifier(self):
         # linear一个线性层接一个sigmoid层，1代表前后关系正确，0代表前后关系错误
         self.pair_classifier = nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size * 4, 1),
+            nn.Linear(self.bert.config.hidden_size * 4, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
             nn.Sigmoid()
         )
 
-    def pair_embedding(self, emb1, emb2):
-        return torch.cat([emb1, emb2, torch.abs(emb1 - emb2), emb1 * emb2], dim=-1)
-    
 
 def train_pair_loss_sentence_bert():
-    model = PairLossSentenceBERT()
+    model = PairLossSentenceBERTDeep()
     model.to(DEVICE)
-    train(epochs=5, model=model, suffix='_pair_loss_sentence_bert')
+    train(epochs=5, model=model, suffix='_pair_loss_sentence_bert_deep')
 
 def test_trained():
     logger = common.logging.getLogger(__name__)
     from pathlib import Path
     directory_path = Path("./checkpoints")
-    search_string = '_pair_loss_sentence_bert'
+    search_string = '_pair_loss_sentence_bert_deep'
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     val_dataloader = default_test_dataloader_provider()
     for file in matching_files:
-        model = PairLossSentenceBERT()
+        model = PairLossSentenceBERTDeep()
         # the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
         load_checkpoint(model, str(file))
         model.to(DEVICE)

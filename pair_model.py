@@ -1,4 +1,5 @@
 # 听gemini的，直接用排序分数矩阵来推算最佳排序
+# NOTE: 在句子对模型中，valid的时候使用句子对顺序头的输出来决定句子位置
 from aux_loss import *
 from sind import *
 from itertools import combinations, permutations
@@ -202,7 +203,7 @@ def get_best_order_by_enumeration_v2(prob_matrix):
     return list(best_perm)
 
 # 使用句子对排序头来预测句子对前后关系，然后组合成最终的排序结果，计算准确率和tau值
-def valid_batched(model = None, split = 'val', split_length = None, dataloader = None):
+def valid_by_pair_head_batched(model = None, split = 'val', split_length = None, dataloader = None):
     model.eval()
     toker = default_tokenizer()
     # 首先将val数据集转换成BertInput格式
@@ -233,11 +234,20 @@ def valid_batched(model = None, split = 'val', split_length = None, dataloader =
     print(f"Average Tau: {avg_tau:.4f}, Average Accuracy: {avg_acc:.4f}, Average PMR: {avg_pmr:.4f}")
     return avg_tau, avg_acc, avg_pmr
 
-def test_trained(the_path = ''):
+def test_trained_by_pair_head(the_path = ''):
     model = PairLossBertV2()
     the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
     load_checkpoint(model, the_path)
     model.to(DEVICE)
     model.eval()
     val_dataloader = default_test_dataloader_provider()
-    return valid_batched(model, dataloader=val_dataloader)
+    return valid_by_pair_head_batched(model, dataloader=val_dataloader)
+
+def test_trained_by_mlm_head(the_path = ''):
+    model = PairLossBertV2()
+    the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
+    load_checkpoint(model, the_path)
+    model.to(DEVICE)
+    model.eval()
+    val_dataloader = default_test_dataloader_provider()
+    return valid_bert_batched(model.bert, dataloader=val_dataloader)

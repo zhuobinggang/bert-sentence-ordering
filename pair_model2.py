@@ -1,4 +1,4 @@
-# 句子对模型分数确实更高，考虑进一步实验
+# 只考虑pair loss的模型，不计算MLM loss，训练时只使用pair loss进行反向传播，测试时只使用pair head进行评估
 from pair_model import *
 import common
 
@@ -63,7 +63,7 @@ def test_trained():
         model.to(DEVICE)
         model.eval()
         # print(f'Testing model from checkpoint: {file}')
-        scores = valid_batched(model, dataloader=val_dataloader)
+        scores = valid_by_pair_head_batched(model, dataloader=val_dataloader)
         print(f'Model: {file}, Test Scores: {scores}')
         logger.warning(f'Model: {file}, Test Scores: {scores}')
 
