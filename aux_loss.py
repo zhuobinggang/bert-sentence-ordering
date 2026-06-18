@@ -6,8 +6,8 @@ import torch
 from recordclass import recordclass
 from tqdm import tqdm
 
-PairLossBertResult = recordclass('PairLossBertResult', 'loss decode_loss pair_loss')
-DOUBLE_CHECK = True # 是否开启训练时的双重检查，反过来训练一次，增加训练信号
+AuxLossBertResult = recordclass('AuxLossBertResult', 'loss decode_loss pair_loss')
+DOUBLE_CHECK = False # 是否开启训练时的双重检查，反过来训练一次，增加训练信号
 
 def print_only_once(*args, input_ids=None):
     if not hasattr(print_only_once, "has_printed"):
@@ -16,9 +16,9 @@ def print_only_once(*args, input_ids=None):
             print(arg)
         print_only_once.has_printed = True
 
-class PairLossBert(nn.Module):
+class AuxLossBert(nn.Module):
     def __init__(self, bert=None):
-        super(PairLossBert, self).__init__()
+        super(AuxLossBert, self).__init__()
         if bert is None:
             bert = default_bert()
         self.bert = bert
@@ -70,7 +70,7 @@ class PairLossBert(nn.Module):
             classification_loss += square_loss
         classification_loss = classification_loss / last_hidden_state.size(0) # 平均每个batch的损失
         loss = decode_loss + classification_loss
-        return PairLossBertResult(loss=loss, decode_loss=decode_loss.item(), pair_loss=classification_loss.item())
+        return AuxLossBertResult(loss=loss, decode_loss=decode_loss.item(), pair_loss=classification_loss.item())
     
     def predict_pair_order_in_paragraph(self, input_ids, attention_mask, labels):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
@@ -133,13 +133,13 @@ class PairLossBert(nn.Module):
         return square_loss
     
 
-def train_pair_loss_bert():
-    model = PairLossBert()
+def train_aux_loss_bert(suffix = '_aux_loss_bert'):
+    model = AuxLossBert()
     model.to(DEVICE)
-    train(epochs=5, model=model, suffix='_pair_loss_bertx2')
+    train(epochs=5, model=model, suffix=suffix)
 
 def test_trained_for_pair():
-    model = PairLossBert()
+    model = AuxLossBert()
     load_checkpoint(model, './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth')
     model.to(DEVICE)
     model.eval()
@@ -150,7 +150,7 @@ def test_trained_for_pair():
     return model
 
 def test_trained_for_pair():
-    model = PairLossBert()
+    model = AuxLossBert()
     load_checkpoint(model, './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth')
     model.to(DEVICE)
     model.eval()
@@ -168,7 +168,7 @@ def test_trained_for_pair():
     print(f"Average pair order accuracy in validation set: {avg_acc:.4f}")
 
 def test_trained():
-    model = PairLossBert()
+    model = AuxLossBert()
     load_checkpoint(model, './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth')
     model.to(DEVICE)
     model.eval()

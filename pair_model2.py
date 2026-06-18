@@ -41,10 +41,10 @@ class PairLossBertWOMLMLoss(PairLossBertV2):
             classification_loss += square_loss
         classification_loss = classification_loss / last_hidden_state.size(0) # 平均每个batch的损失
         # loss = decode_loss + classification_loss
-        return PairLossBertResult(loss=classification_loss, decode_loss=0.0, pair_loss=classification_loss.item())
+        return AuxLossBertResult(loss=classification_loss, decode_loss=0.0, pair_loss=classification_loss.item())
     
 
-def train_pair_loss_bert():
+def train_aux_loss_bert():
     model = PairLossBertWOMLMLoss()
     model.to(DEVICE)
     train(epochs=5, model=model, suffix='_pair_loss_bert_womlm')
@@ -68,7 +68,7 @@ def test_trained():
         logger.warning(f'Model: {file}, Test Scores: {scores}')
 
 def train_and_test():
-    train_pair_loss_bert()
+    train_aux_loss_bert()
     test_trained()
 
 

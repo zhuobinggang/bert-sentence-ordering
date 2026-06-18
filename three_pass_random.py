@@ -20,14 +20,14 @@ def valid_bert_three_pass_random(bert = None, split = 'val', bert_inputs = None)
         # predicted_labels = hungarian_algorithm_best_order(mask_token_logits.cpu().numpy())
         true_labels = [label for label in bert_input.labels if label != -100]
         true_labels = [reversed_dict[b] for b in true_labels]
-        # 三次解码
-        for _ in range(3):
+        # 加两次解码
+        for _ in range(2):
             random_indices  = add_one(random.sample(range(5), 5))
             new_input_ids = resort_token_ids(bert_input.input_ids, random_indices)
             temp_mask_token_5index_logits = get_mask_token_5index_logits(new_input_ids, bert_input.attention_mask, bert)
             for original_indice, target_indice in enumerate(random_indices):
                 mask_token_5index_logits[original_indice] += temp_mask_token_5index_logits[target_indice - 1]
-        mask_token_5index_logits = mask_token_5index_logits / 3
+        mask_token_5index_logits = mask_token_5index_logits / 2
         predicted_labels = hungarian_algorithm_best_order(mask_token_5index_logits.cpu().numpy())
         all_predicted_labels.append(predicted_labels)
         all_true_labels.append(true_labels)

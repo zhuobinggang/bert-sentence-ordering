@@ -31,7 +31,7 @@ def transform_to_label_format(best_order):
     return converted_pred
 
 # 先检查所有MASK对的预测结果
-class PairLossBertV2(PairLossBert):
+class PairLossBertV2(AuxLossBert):
     def predict_pair_order_in_paragraph(self, input_ids, attention_mask, labels):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
         last_hidden_state = outputs.hidden_states[-1]  # [batch_size, seq_len, hidden_size]
