@@ -234,6 +234,7 @@ def valid_by_pair_head_batched(model = None, split = 'val', split_length = None,
     print(f"Average Tau: {avg_tau:.4f}, Average Accuracy: {avg_acc:.4f}, Average PMR: {avg_pmr:.4f}")
     return avg_tau, avg_acc, avg_pmr
 
+@torch.no_grad()
 def test_trained_by_pair_head(the_path = ''):
     model = PairLossBertV2()
     the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
@@ -243,6 +244,7 @@ def test_trained_by_pair_head(the_path = ''):
     val_dataloader = default_test_dataloader_provider()
     return valid_by_pair_head_batched(model, dataloader=val_dataloader)
 
+@torch.no_grad()
 def test_trained_by_mlm_head(the_path = ''):
     model = PairLossBertV2()
     the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
