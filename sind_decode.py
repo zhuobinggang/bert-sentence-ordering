@@ -36,7 +36,7 @@ def valid_bert_batched_decode(bert = None, split = 'val', split_length = None, d
             # predicted_token_ids = logits[i, mask_token_bool].argmax(axis=-1) # [5]
             predicted_token_ids = logits[i, mask_token_bool] # [5, vocab_size]
             predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
-            predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy()) # [5] 每个位置的最终标签（1-5）
+            predicted_labels = hungarian_algorithm_best_order(predicted_token_ids.cpu().numpy()) # [5] 每个位置的最终标签（1-5）
             true_label_ids = label_ids[i][label_ids[i] != -100] # [5]
             assert len(predicted_token_ids) == len(true_label_ids) == 5, "There should be exactly 5 predicted and true labels"
             # predicted_labels = [reversed_dict.get(a.item(), 5) for a in predicted_token_ids]
@@ -49,7 +49,7 @@ def valid_bert_batched_decode(bert = None, split = 'val', split_length = None, d
     # _ = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = True)
     return test_result
 
-def get_valid_permutation(model_outputs):
+def hungarian_algorithm_best_order(model_outputs):
     """
     model_outputs: 模型的原始输出。
     假设形状为 (5, 5)，即 5个句子，每个句子对应 5个位置的 logit 或 softmax 概率值。
@@ -79,7 +79,7 @@ def test_get_valid_permutation():
     index_dict = indexs_tokenized()
     index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
     dd = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
-    return get_valid_permutation(dd.cpu().numpy())
+    return hungarian_algorithm_best_order(dd.cpu().numpy())
 
 def test_valid_bert_batched():
     bert = default_bert()

@@ -215,8 +215,7 @@ def decode_by_bert_keep_repeated(input_ids, attention_mask, bert=None):
     assert len(predicted_token_ids) == 5, "There should be exactly 5 predicted token ids"
     return predicted_token_ids.tolist()
 
-# 使用匈牙利算法解码得到标签
-def decode_by_bert(input_ids, attention_mask, bert=None):
+def get_mask_token_5index_logits(input_ids, attention_mask, bert=None):
     toker = default_tokenizer()
     if bert is None:
         bert = default_bert()
@@ -225,11 +224,16 @@ def decode_by_bert(input_ids, attention_mask, bert=None):
     with torch.no_grad():
         logits = bert(input_ids = input_ids, attention_mask = attention_mask).logits # [1, 512, 30522]
     mask_token_bool = (input_ids == toker.mask_token_id)
-    predicted_token_ids = logits[mask_token_bool]  # [5, vocab_size]
+    mask_token_logits = logits[mask_token_bool]  # [5, vocab_size]
     index_dict = indexs_tokenized()
     index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
-    predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
-    predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy())
+    mask_token_logits = mask_token_logits[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
+    return mask_token_logits
+
+# 使用匈牙利算法解码得到标签
+def decode_by_bert(input_ids, attention_mask, bert=None):
+    mask_token_logits = get_mask_token_5index_logits(input_ids, attention_mask, bert)
+    predicted_labels = hungarian_algorithm_best_order(mask_token_logits.cpu().numpy())
     assert len(predicted_labels) == 5, "There should be exactly 5 predicted token ids"
     return predicted_labels.tolist()
 
@@ -360,7 +364,7 @@ def valid_bert_batched_keep_repeated(bert = None, split = 'val', split_length = 
 
 
 # 匈牙利算法 2026.6.15
-def get_valid_permutation(model_outputs):
+def hungarian_algorithm_best_order(model_outputs):
     """
     model_outputs: 模型的原始输出。
     假设形状为 (5, 5)，即 5个句子，每个句子对应 5个位置的 logit 或 softmax 概率值。
@@ -418,7 +422,7 @@ def valid_bert_batched(bert = None, split = 'val', split_length = None, dataload
             # predicted_token_ids = logits[i, mask_token_bool].argmax(axis=-1) # [5]
             predicted_token_ids = logits[i, mask_token_bool] # [5, vocab_size]
             predicted_token_ids = predicted_token_ids[:, index_1_to_5_token_ids] # [5, 5] 每个mask位置对应5个标签的logits
-            predicted_labels = get_valid_permutation(predicted_token_ids.cpu().numpy()) # [5] 每个位置的最终标签（1-5）
+            predicted_labels = hungarian_algorithm_best_order(predicted_token_ids.cpu().numpy()) # [5] 每个位置的最终标签（1-5）
             true_label_ids = label_ids[i][label_ids[i] != -100] # [5]
             assert len(predicted_token_ids) == len(true_label_ids) == 5, "There should be exactly 5 predicted and true labels"
             # predicted_labels = [reversed_dict.get(a.item(), 5) for a in predicted_token_ids]
