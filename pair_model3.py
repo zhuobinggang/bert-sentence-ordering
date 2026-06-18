@@ -20,7 +20,7 @@ def train_pair_loss_sentence_bert():
     model.to(DEVICE)
     train(epochs=5, model=model, suffix='_pair_loss_sentence_bert')
 
-def test_trained():
+def test_trained_pair_head():
     logger = common.logging.getLogger(__name__)
     from pathlib import Path
     directory_path = Path("./checkpoints")
@@ -38,9 +38,29 @@ def test_trained():
         print(f'Model: {file}, Test Scores: {scores}')
         logger.warning(f'Model: {file}, Test Scores: {scores}')
 
+
+def test_trained_mlm_head():
+    logger = common.logging.getLogger(__name__)
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    search_string = '_pair_loss_sentence_bert'
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    val_dataloader = default_test_dataloader_provider()
+    for file in matching_files:
+        model = PairLossSentenceBERT()
+        # the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
+        load_checkpoint(model, str(file))
+        model.to(DEVICE)
+        model.eval()
+        # print(f'Testing model from checkpoint: {file}')
+        scores = valid_bert_batched(model.bert, dataloader=val_dataloader)
+        print(f'Model: {file}, Test Scores: {scores}')
+        logger.warning(f'Model: {file}, Test Scores: {scores}')
+
 def train_and_test():
     train_pair_loss_sentence_bert()
-    test_trained()
+    test_trained_pair_head()
+    test_trained_mlm_head()
 
 
 if __name__ == "__main__":
