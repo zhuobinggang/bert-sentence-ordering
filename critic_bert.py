@@ -81,13 +81,23 @@ def dataset_filtered(split = 'train'):
     dataset = json.load(open(f'./temp_datasets/{split}_two_pass_results.json', 'r'))
     # val_set = json.load(open('./temp_datasets/val_two_pass_results.json', 'r'))
     items = []
+    skip_count_tau_equal = 0
     for item in dataset:
         predicted_label_first = item['predicted_label_first']
         predicted_label_second = item['predicted_label_second']
+        true_label = item['true_label']
         if list_equal(predicted_label_first, predicted_label_second):
             continue # 如果一致，不需要训练critic bert
-        else:
-            items.append(item)
+        # 计算两者的性能差异
+        tau1 = cal_tau(predicted_label_first, true_label)
+        tau2 = cal_tau(predicted_label_second, true_label)
+        # 【重要修复】：如果两个预测的 Tau 值一样，Critic 无法判断谁好，直接跳过该样本
+        if abs(tau1 - tau2) < 1e-3: # 如果两者的tau值差异小于1e-6，认为是一样的
+            print(f"Skipping item due to identical tau values")
+            skip_count_tau_equal += 1
+            continue
+        items.append(item)
+    print(f"Skipped {skip_count_tau_equal} items due to identical tau values.")
     return items
 
 def train():
