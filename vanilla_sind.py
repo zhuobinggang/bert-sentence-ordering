@@ -1,9 +1,11 @@
 from sind import train, default_bert, load_checkpoint, DEVICE, valid_bert_batched
 import common
 
-def train_n_repeats(n = 5):
+def train_n_repeats():
+    n = common.args.repeats
+    offset = common.args.offset
     for i in range(n):
-        train(suffix = f'_vanilla_sind_{i+1}')
+        train(suffix = f'_vanilla_sind_{i + offset}')
 
 def test_trained():
     from pathlib import Path
@@ -20,5 +22,5 @@ def test_trained():
         common.logging.warning(f'Model vanilla sind: {file}, Test Result: {result}')
 
 if __name__ == "__main__":
-    train_n_repeats(5)
+    train_n_repeats()
     test_trained()

@@ -4,9 +4,11 @@ from aux_loss import AuxLossBert, train_aux_loss_bert
 from sind import load_checkpoint, DEVICE
 import common
 
-def train_n_repeats(n = 5):
+def train_n_repeats():
+    n = common.args.repeats
+    offset = common.args.offset
     for i in range(n):
-        train_aux_loss_bert(suffix = f'_aux_loss_repeat_{i+1}')
+        train_aux_loss_bert(suffix = f'_aux_loss_repeat_{i + offset}')
 
 def test():
     from pathlib import Path
@@ -34,5 +36,5 @@ def test_pair_head():
         test_trained_by_pair_head(str(file))
 
 if __name__ == "__main__":
-    train_n_repeats(5)
+    train_n_repeats()
     test()

@@ -13,9 +13,11 @@ def train_aux_loss_bert_rocs(suffix = '_aux_loss_rocs_bert'):
           trian_dataloader_provider=train_dataloader_provider, 
           val_dataloader_provider=val_dataloader_provider)
 
-def train_n_repeats(n = 5):
+def train_n_repeats():
+    n = common.args.repeats
+    offset = common.args.offset
     for i in range(n):
-        train_aux_loss_bert_rocs(suffix = f'_aux_loss_rocs_repeat_{i+1}')
+        train_aux_loss_bert_rocs(suffix = f'_aux_loss_rocs_repeat_{i + offset}')
 
 def test():
     from pathlib import Path
@@ -34,5 +36,5 @@ def test():
         common.logging.warning(f'Model ROCS: {file}, Test Result: {result}')
 
 if __name__ == "__main__":
-    train_n_repeats(5)
+    train_n_repeats()
     test()

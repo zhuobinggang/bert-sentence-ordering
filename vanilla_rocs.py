@@ -1,9 +1,11 @@
 from rocs import *
 from sind import DEVICE
 
-def train_n_repeats(n = 5):
+def train_n_repeats():
+    n = common.args.repeats
+    offset = common.args.offset
     for i in range(n):
-        train(suffix=f'_vanilla_rocs_{i+1}', 
+        train(suffix=f'_vanilla_rocs_{i + offset}', 
               trian_dataloader_provider=train_dataloader_provider, 
               val_dataloader_provider=val_dataloader_provider)
         
@@ -23,5 +25,5 @@ def test_trained():
         common.logging.warning(f'Model vanilla rocs: {file}, Test Result: {result}')
 
 if __name__ == "__main__":
-    train_n_repeats(5)
+    train_n_repeats()
     test_trained()
