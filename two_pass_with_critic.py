@@ -75,7 +75,7 @@ def run():
         true_label = result['all_true_labels'][i]
         pred_first = result['all_predicted_labels_first'][i]
         pred_second = result['all_predicted_labels_second'][i]
-        if pred_first == pred_second:
+        if list_equal(pred_first, pred_second):
             # 如果两次预测结果相同，直接使用pred_first作为最终预测结果
             all_preds.append(pred_first)
         else:
