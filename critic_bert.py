@@ -1,11 +1,11 @@
 # 用bert来判断两个段落哪个更好
 from two_pass_plus import *
 
-def run():
+def run(split = 'train'):
     bert = default_bert()
     load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
     # valid_bert(bert, 'test')
-    paragraphs = sind_only_texts_get_by_split('train')
+    paragraphs = sind_only_texts_get_by_split(split)
     train_inputs = sind_data_prepare(paragraphs)
     result = valid_bert_two_pass_plus(bert=bert, bert_inputs=train_inputs) # 这个要10分钟
     # 按照result['all_true_labels']的顺序对段落进行排序
