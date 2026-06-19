@@ -100,6 +100,7 @@ def train():
     ]
     optimizer = torch.optim.AdamW(optimizer_groups)
     train_set = dataset_filtered('train')
+    writer = common.get_writer()
     # val_set = json.load(open('./temp_datasets/val_two_pass_results.json', 'r'))
     for item in tqdm(train_set, desc="Training CriticBert"):
         paragraph = item['paragraph']
@@ -119,14 +120,20 @@ def train():
             # 计算loss
             probs = model(inputs_ids, attention_mask) # [1, 1]
             square_loss = (probs - label) ** 2
+            writer.add_scalar(f'Loss', square_loss.item(), writer.global_step)
+            writer.global_step += 1
             # backward and step
-            optimizer.zero_grad()
             square_loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
     save_checkpoint(model, prefix='critic_bert', suffix = 'e0')
     valid_trained(model)
 
-def valid_trained(model):
+def valid_trained(model = None):
+    if model is None:
+        model = CriticBert()
+        load_checkpoint(model, 'checkpoints/critic_bert_e0.pth')
+    model.to(DEVICE)
     model.eval()
     val_set = dataset_filtered('val')
     labels = []
