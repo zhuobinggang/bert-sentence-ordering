@@ -489,9 +489,9 @@ def calculate_all_one_baseline(split):
     return test_result
 
 
-def save_checkpoint(bert, base_path = 'checkpoints', epoch = -1, valid_score = -1, suffix = ''):
+def save_checkpoint(bert, base_path = 'checkpoints', epoch = -1, valid_score = -1, suffix = '', prefix = 'SIND_best'):
     # path = f'{base_path}/{self.prefix}_epoch_{epoch}.pth'
-    path = f'{base_path}/SIND_best_{suffix}.pth'
+    path = f'{base_path}/{prefix}_{suffix}.pth'
     torch.save({
         'epoch': epoch,
         'state': bert.state_dict(),
