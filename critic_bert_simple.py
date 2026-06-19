@@ -70,54 +70,56 @@ def train():
     batch_size = 8 # 每次处理8个原始段落（16个输入样本）
     accumulated_loss = []
     optimizer.zero_grad()
-    
-    for i, tgt_paragraph in enumerate(tqdm(correct_paragraphs, desc="Training Critic Pointwise")):
-        # 1. 构造正样本 (Label = 1.0)
-        pos_ids, pos_mask = build_bert_input(tgt_paragraph)
-        
-        # 2. 构造负样本 (随机 Swap 两个句子, Label = 0.0)
-        neg_paragraph = create_corrupted_paragraph(tgt_paragraph)
-        neg_ids, neg_mask = build_bert_input(neg_paragraph)
-        
-        # 3. 将它们打包输入（这里为了绝对安全，我们用串行前向，并行反向）
-        # 正样本前向
-        pos_ids_t = torch.tensor(pos_ids).unsqueeze(0).to(DEVICE)
-        pos_mask_t = torch.tensor(pos_mask).unsqueeze(0).to(DEVICE)
-        pos_label = torch.tensor([[1.0]], dtype=torch.float).to(DEVICE)
-        pos_logits = model(pos_ids_t, pos_mask_t)
-        loss_pos = criterion(pos_logits, pos_label) / (batch_size * 2)
-        loss_pos.backward()
-        
-        # 负样本前向
-        neg_ids_t = torch.tensor(neg_ids).unsqueeze(0).to(DEVICE)
-        neg_mask_t = torch.tensor(neg_mask).unsqueeze(0).to(DEVICE)
-        neg_label = torch.tensor([[0.0]], dtype=torch.float).to(DEVICE)
-        neg_logits = model(neg_ids_t, neg_mask_t)
-        loss_neg = criterion(neg_logits, neg_label) / (batch_size * 2)
-        loss_neg.backward()
-        
-        accumulated_loss.append(loss_pos.item() * batch_size * 2 + loss_neg.item() * batch_size * 2)
-        
-        # 满足 Batch Size 更新梯度
-        if (i + 1) % batch_size == 0:
-            optimizer.step()
-            optimizer.zero_grad()
-            writer.add_scalar('Loss', np.mean(accumulated_loss), writer.global_step)
-            accumulated_loss = []
-            writer.global_step += 1
-
-    # 挽底更新
-    optimizer.step()
-    optimizer.zero_grad()
-    
-    save_checkpoint(model, prefix='critic_bert', suffix='pointwise_good')
-    return valid_trained(model)
+    best_acc = 0.0
+    for epoch in range(5):
+        for i, tgt_paragraph in enumerate(tqdm(correct_paragraphs, desc="Training Critic Pointwise")):
+            # 1. 构造正样本 (Label = 1.0)
+            pos_ids, pos_mask = build_bert_input(tgt_paragraph)
+            
+            # 2. 构造负样本 (随机 Swap 两个句子, Label = 0.0)
+            neg_paragraph = create_corrupted_paragraph(tgt_paragraph)
+            neg_ids, neg_mask = build_bert_input(neg_paragraph)
+            
+            # 3. 将它们打包输入（这里为了绝对安全，我们用串行前向，并行反向）
+            # 正样本前向
+            pos_ids_t = torch.tensor(pos_ids).unsqueeze(0).to(DEVICE)
+            pos_mask_t = torch.tensor(pos_mask).unsqueeze(0).to(DEVICE)
+            pos_label = torch.tensor([[1.0]], dtype=torch.float).to(DEVICE)
+            pos_logits = model(pos_ids_t, pos_mask_t)
+            loss_pos = criterion(pos_logits, pos_label) / (batch_size * 2)
+            loss_pos.backward()
+            
+            # 负样本前向
+            neg_ids_t = torch.tensor(neg_ids).unsqueeze(0).to(DEVICE)
+            neg_mask_t = torch.tensor(neg_mask).unsqueeze(0).to(DEVICE)
+            neg_label = torch.tensor([[0.0]], dtype=torch.float).to(DEVICE)
+            neg_logits = model(neg_ids_t, neg_mask_t)
+            loss_neg = criterion(neg_logits, neg_label) / (batch_size * 2)
+            loss_neg.backward()
+            
+            accumulated_loss.append(loss_pos.item() * batch_size * 2 + loss_neg.item() * batch_size * 2)
+            
+            # 满足 Batch Size 更新梯度
+            if (i + 1) % batch_size == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                writer.add_scalar('Loss', np.mean(accumulated_loss), writer.global_step)
+                accumulated_loss = []
+                writer.global_step += 1
+        # 挽底更新
+        optimizer.step()
+        optimizer.zero_grad()
+        acc = valid_trained(model)
+        if acc > best_acc:
+            print(f"New best accuracy: {acc:.4f}, save model checkpoint")
+            best_acc = acc
+            save_checkpoint(model, prefix='critic_bert', suffix='pointwise_best')
 
 
 def valid_trained(model = None):
     if model is None:
         model = CriticBert()
-        load_checkpoint(model, 'checkpoints/critic_bert_pointwise_good.pth')
+        load_checkpoint(model, 'checkpoints/critic_bert_pointwise_best.pth')
     model.to(DEVICE)
     model.eval()
     

@@ -72,6 +72,7 @@ def run():
     critic.eval()
     all_true_labels = []
     all_preds = []
+    printed = False
     for i in tqdm(range(len(original_order_paragraphs)), desc="Scoring with Critic"):
         paragraph = original_order_paragraphs[i]
         true_label = result['all_true_labels'][i]
@@ -87,6 +88,13 @@ def run():
             score_first = get_critic_score(critic, para_first)
             para_second = resort_paragraph(paragraph, pred_second)
             score_second = get_critic_score(critic, para_second)
+            if not printed:
+                print(f'Original paragraph: {paragraphs[i]}')
+                print(f"Resorted paragraph: {paragraph}")
+                print(f"True label: {true_label}")
+                print(f"Predicted first: {pred_first}, score: {score_first}")
+                print(f"Predicted second: {pred_second}, score: {score_second}")
+                printed = True
             if score_first > score_second:
                 all_preds.append(pred_first)
             else:
