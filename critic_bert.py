@@ -110,6 +110,8 @@ def train():
         if list_equal(predicted_label_first, predicted_label_second):
             continue # 如果一致，不需要训练critic bert
         else:
+            if random.random() < 0.5: # 随机交换first和second的顺序，增加训练的多样性
+                predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
             inputs_ids, attention_mask = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
             inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) # [1, seq_len]
@@ -120,6 +122,7 @@ def train():
             # 计算loss
             probs = model(inputs_ids, attention_mask) # [1, 1]
             square_loss = (probs - label) ** 2
+            # print(square_loss.item())
             writer.add_scalar(f'Loss', square_loss.item(), writer.global_step)
             writer.global_step += 1
             # backward and step
