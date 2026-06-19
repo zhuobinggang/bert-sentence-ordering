@@ -102,6 +102,8 @@ def train():
     train_set = dataset_filtered('train')
     writer = common.get_writer()
     # val_set = json.load(open('./temp_datasets/val_two_pass_results.json', 'r'))
+    batch_size = 16
+    batch_loss = []
     for item in tqdm(train_set, desc="Training CriticBert"):
         paragraph = item['paragraph']
         true_label = item['true_label']
@@ -123,12 +125,19 @@ def train():
             probs = model(inputs_ids, attention_mask) # [1, 1]
             square_loss = (probs - label) ** 2
             # print(square_loss.item())
-            writer.add_scalar(f'Loss', square_loss.item(), writer.global_step)
-            writer.global_step += 1
+            batch_loss.append(square_loss.item())
             # backward and step
             square_loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            batch_size -= 1
+            if batch_size == 0:
+                batch_size = 16
+                optimizer.step()
+                optimizer.zero_grad()
+                writer.add_scalar(f'Loss', np.mean(batch_loss), writer.global_step)
+                batch_loss = []
+                writer.global_step += 1
+    optimizer.step()
+    optimizer.zero_grad()
     save_checkpoint(model, prefix='critic_bert', suffix = 'e0')
     valid_trained(model)
 
@@ -165,4 +174,4 @@ def valid_trained(model = None):
     recall = recall_score(labels, predicts)
     precision = precision_score(labels, predicts)
     print(f"F1: {f1}, Recall: {recall}, Precision: {precision}")
-    return f1, recall, precision
+    return predicts, labels
