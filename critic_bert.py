@@ -42,17 +42,14 @@ class CriticBert(nn.Module):
     def __init__(self):
         super(CriticBert, self).__init__()
         self.bert = default_bert()
-        self.head = nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size, 1),
-            nn.Sigmoid()
-        )
+        self.head = nn.Linear(self.bert.config.hidden_size, 1) # 去掉 nn.Sigmoid()
 
     def forward(self, input_ids, attention_mask, token_type_ids):
-        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, output_hidden_states=True)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
-        last_hidden_state = outputs.hidden_states[-1]  # [batch_size, seq_len, hidden_size]
-        cls_hidden_state = last_hidden_state[:, 0, :]  # [batch_size, hidden_size]
-        probs = self.head(cls_hidden_state)  # [batch_size, 1]
-        return probs
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, output_hidden_states=True) 
+        last_hidden_state = outputs.hidden_states[-1] 
+        cls_hidden_state = last_hidden_state[:, 0, :] 
+        logits = self.head(cls_hidden_state) # 输出的是实数 Logits，而不是 0~1 的概率
+        return logits
 
 def bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second):
     # 将段落按照predicted_label_first的顺序进行排序
@@ -97,53 +94,81 @@ def train():
     model = CriticBert()
     model.to(DEVICE)
     model.train()
+    
+    # 因为修复了梯度放大问题，合理的 BERT 微调学习率建议在 1e-5 ~ 3e-5
     optimizer_groups = [
-        {"params": model.bert.parameters(), "lr": 5e-5},  
-        {"params": model.head.parameters(), "lr": 5e-3} 
+        {"params": model.bert.parameters(), "lr": 2e-5},  
+        {"params": model.head.parameters(), "lr": 1e-3} 
     ]
     optimizer = torch.optim.AdamW(optimizer_groups)
+    
+    # 使用二分类交叉熵损失（自带数值稳定优化，防饱和）
+    criterion = nn.BCEWithLogitsLoss()
+    
     train_set = dataset_filtered('train')
     writer = common.get_writer()
-    # val_set = json.load(open('./temp_datasets/val_two_pass_results.json', 'r'))
-    batch_size = 16
+    
+    batch_size_target = 16
+    accumulated_counter = 0
     batch_loss = []
+    
+    optimizer.zero_grad() # 在循环外先清空一次
+    
     for item in tqdm(train_set, desc="Training CriticBert"):
         paragraph = item['paragraph']
         true_label = item['true_label']
         predicted_label_first = item['predicted_label_first']
         predicted_label_second = item['predicted_label_second']
-        if list_equal(predicted_label_first, predicted_label_second):
-            continue # 如果一致，不需要训练critic bert
-        else:
-            if random.random() < 0.5: # 随机交换first和second的顺序，增加训练的多样性
-                predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
-            inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
-            inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
-            attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) # [1, seq_len]
-            token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
-            # 计算label
-            tau1 = cal_tau(predicted_label_first, true_label)
-            tau2 = cal_tau(predicted_label_second, true_label)
-            label = 1 if tau1 > tau2 else 0
-            # 计算loss
-            probs = model(inputs_ids, attention_mask, token_type_ids) # [1, 1]
-            square_loss = (probs - label) ** 2
-            # print(square_loss.item())
-            batch_loss.append(square_loss.item())
-            # backward and step
-            square_loss.backward()
-            batch_size -= 1
-            if batch_size == 0:
-                batch_size = 16
-                optimizer.step()
-                optimizer.zero_grad()
-                writer.add_scalar(f'Loss', np.mean(batch_loss), writer.global_step)
-                batch_loss = []
-                writer.global_step += 1
-    optimizer.step()
-    optimizer.zero_grad()
-    save_checkpoint(model, prefix='critic_bert', suffix = 'e0')
-    valid_trained(model)
+        
+        # 计算两者的性能差异
+        tau1 = cal_tau(predicted_label_first, true_label)
+        tau2 = cal_tau(predicted_label_second, true_label)
+        
+        # 【重要修复】：如果两个预测的 Tau 值一样，Critic 无法判断谁好，直接跳过该样本
+        if tau1 == tau2:
+            continue
+            
+        # 数据增强：随机交换位置
+        if random.random() < 0.5:
+            predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
+            tau1, tau2 = tau2, tau1
+            
+        label = 1.0 if tau1 > tau2 else 0.0
+        label_tensor = torch.tensor([[label]], dtype=torch.float).to(DEVICE)
+        
+        # 准备输入
+        inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
+        inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) 
+        attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) 
+        token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) 
+        
+        # 前向传播得到 logits
+        logits = model(inputs_ids, attention_mask, token_type_ids) 
+        
+        # 【重要修复】：计算损失时除以 16，实现真正、平滑的梯度累加（Mean Gradient Scaling）
+        loss = criterion(logits, label_tensor) / batch_size_target
+        loss.backward()
+        
+        batch_loss.append(loss.item() * batch_size_target) # 还原真实 loss 用于统计
+        accumulated_counter += 1
+        
+        # 凑满一个完整的 Batch，更新一次参数
+        if accumulated_counter == batch_size_target:
+            optimizer.step()
+            optimizer.zero_grad()
+            accumulated_counter = 0
+            
+            writer.add_scalar(f'Loss', np.mean(batch_loss), writer.global_step)
+            batch_loss = []
+            writer.global_step += 1
+            
+    # 处理末尾不满 16 个样本残余的梯度
+    if accumulated_counter > 0:
+        optimizer.step()
+        optimizer.zero_grad()
+        
+    save_checkpoint(model, prefix='critic_bert', suffix='cool')
+    return valid_trained(model)
 
 def valid_trained(model = None):
     if model is None:
@@ -170,8 +195,8 @@ def valid_trained(model = None):
             attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) # [1, seq_len]
             token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             with torch.no_grad():
-                probs = model(inputs_ids, attention_mask, token_type_ids)
-            predict = 1 if probs.item() > 0.5 else 0
+                logits = model(inputs_ids, attention_mask, token_type_ids)
+            predict = 1 if logits.item() > 0.0 else 0
             predicts.append(predict)
             labels.append(label)
     from sklearn.metrics import f1_score, recall_score, precision_score
