@@ -1,4 +1,5 @@
 import random
+import common
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -44,7 +45,7 @@ def train():
     model = CriticBert()
     model.to(DEVICE)
     model.train()
-    
+    writer = common.get_writer()
     # 标准微调设置
     optimizer = torch.optim.AdamW([
         {"params": model.bert.parameters(), "lr": 2e-5},  
@@ -91,9 +92,10 @@ def train():
         if (i + 1) % batch_size == 0:
             optimizer.step()
             optimizer.zero_grad()
-            # 这里可以加上你的 writer.add_scalar 记录平均 loss
+            writer.add_scalar('Loss', np.mean(accumulated_loss), writer.global_step)
             accumulated_loss = []
-            
+            writer.global_step += 1
+
     # 挽底更新
     optimizer.step()
     optimizer.zero_grad()
