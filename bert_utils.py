@@ -18,8 +18,8 @@ def default_tokenizer():
     else:
         return RobertaTokenizer.from_pretrained(ROBERTA_BASE_UNCASED_MODEL_ID)
 
-@lru_cache(maxsize=1)
 def default_bert():
+    print('重新载入BERT模型...')
     from transformers import BertForMaskedLM, RobertaForMaskedLM
     model = None
     if USING_BERT:
