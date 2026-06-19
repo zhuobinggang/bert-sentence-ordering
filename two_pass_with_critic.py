@@ -72,9 +72,10 @@ def run():
     critic.eval()
     all_true_labels = []
     all_preds = []
-    for i in range(len(original_order_paragraphs)):
+    for i in tqdm(range(len(original_order_paragraphs)), desc="Scoring with Critic"):
         paragraph = original_order_paragraphs[i]
         true_label = result['all_true_labels'][i]
+        all_true_labels.append(true_label)
         pred_first = result['all_predicted_labels_first'][i]
         pred_second = result['all_predicted_labels_second'][i]
         if list_equal(pred_first, pred_second):
