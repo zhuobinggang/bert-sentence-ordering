@@ -87,7 +87,6 @@ def run():
             score_first = get_critic_score(critic, para_first)
             para_second = resort_paragraph(paragraph, pred_second)
             score_second = get_critic_score(critic, para_second)
-            all_true_labels.append(true_label)
             if score_first > score_second:
                 all_preds.append(pred_first)
             else:
@@ -95,4 +94,4 @@ def run():
     print("Final results after critic scoring:")
     final_result = cal_tau_acc_pmr(all_preds, all_true_labels, need_fix = False)
     print(final_result)
-    return final_result
+    return all_true_labels, all_preds

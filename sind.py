@@ -265,6 +265,8 @@ def cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False):
     if need_fix:
         all_predicted_labels = [fix_predicted_sequence(pred) for pred in all_predicted_labels]
         all_true_labels = [fix_predicted_sequence(true) for true in all_true_labels]
+    if len(all_predicted_labels) != len(all_true_labels):
+        raise ValueError("The number of predicted labels and true labels must be the same.")
     taus = []
     for predicted_labels, true_labels in zip(all_predicted_labels, all_true_labels):
         tau = cal_tau(predicted_labels, true_labels)
