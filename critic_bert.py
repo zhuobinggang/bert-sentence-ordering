@@ -8,6 +8,21 @@ import json
 
 MAX_SENTENCE_TOKENS = 50 # 因为有10句话，BERT的最大输入限制是512，所以平均每句话不能超过50个token
 
+# 将排好的段落s1, s2, s3, s4, s5按predicted_label重建未排序的段落
+def recover_unsorted_paragraph(paragraph, predicted_label):
+    """ 根据predicted_label重排paragraph，得到新的段落顺序 """
+    unsorted_paragraph = [None] * 5
+    for idx, label in enumerate(predicted_label):
+        unsorted_paragraph[idx] = paragraph[label - 1] # label是1-5的索引
+    return unsorted_paragraph
+
+def resort_paragraph(paragraph, predicted_label):
+    """ 根据predicted_label重排paragraph，得到新的段落顺序 """
+    ordered_paragraph = [None] * 5
+    for idx, label in enumerate(predicted_label):
+        ordered_paragraph[label - 1] = paragraph[idx] # label是1-5的索引
+    return ordered_paragraph
+
 def dataset_create(split = 'train'):
     bert = default_bert()
     load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
@@ -18,10 +33,7 @@ def dataset_create(split = 'train'):
     # 按照result['all_true_labels']的顺序对段落进行排序
     original_order_paragraphs = []
     for paragraph, true_label in zip(paragraphs, result['all_true_labels']):
-        ordered_paragraph = [None] * 5
-        for idx, label in enumerate(true_label):
-            ordered_paragraph[idx] = paragraph[label - 1] # label是1-5的索引
-        original_order_paragraphs.append(ordered_paragraph)
+        original_order_paragraphs.append(recover_unsorted_paragraph(paragraph, true_label))
     # 将original_order_paragraphs和对应的all_true_labels, all_predicted_labels_first, all_predicted_labels_second一起保存到文件中
     output_data = []
     for paragraph, true_label, pred_first, pred_second in zip(original_order_paragraphs, result['all_true_labels'], result['all_predicted_labels_first'], result['all_predicted_labels_second']):

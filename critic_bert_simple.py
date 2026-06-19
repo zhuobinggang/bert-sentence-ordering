@@ -41,6 +41,16 @@ def create_corrupted_paragraph(clean_paragraph):
     corrupted[idx1], corrupted[idx2] = corrupted[idx2], corrupted[idx1]
     return corrupted
 
+def get_critic_score(critic_model, paragraph):
+    """ 输入一个段落，返回其连贯性得分 """
+    input_ids, attention_mask = build_bert_input(paragraph)
+    input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
+    attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)
+    
+    with torch.no_grad():
+        score = critic_model(input_ids_t, attention_mask_t).item()
+    return score
+
 def train():
     model = CriticBert()
     model.to(DEVICE)
