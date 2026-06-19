@@ -123,61 +123,60 @@ def train():
     batch_loss = []
     
     optimizer.zero_grad() # 在循环外先清空一次
-    
-    for item in tqdm(train_set, desc="Training CriticBert"):
-        paragraph = item['paragraph']
-        true_label = item['true_label']
-        predicted_label_first = item['predicted_label_first']
-        predicted_label_second = item['predicted_label_second']
-        
-        # 计算两者的性能差异
-        tau1 = cal_tau(predicted_label_first, true_label)
-        tau2 = cal_tau(predicted_label_second, true_label)
-        
-        # 【重要修复】：如果两个预测的 Tau 值一样，Critic 无法判断谁好，直接跳过该样本
-        if tau1 == tau2:
-            continue
+    for epoch in range(3):
+        for item in tqdm(train_set, desc="Training CriticBert"):
+            paragraph = item['paragraph']
+            true_label = item['true_label']
+            predicted_label_first = item['predicted_label_first']
+            predicted_label_second = item['predicted_label_second']
             
-        # 数据增强：随机交换位置
-        if random.random() < 0.5:
-            predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
-            tau1, tau2 = tau2, tau1
+            # 计算两者的性能差异
+            tau1 = cal_tau(predicted_label_first, true_label)
+            tau2 = cal_tau(predicted_label_second, true_label)
             
-        label = 1.0 if tau1 > tau2 else 0.0
-        label_tensor = torch.tensor([[label]], dtype=torch.float).to(DEVICE)
-        
-        # 准备输入
-        inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
-        inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) 
-        attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) 
-        token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) 
-        
-        # 前向传播得到 logits
-        logits = model(inputs_ids, attention_mask, token_type_ids) 
-        
-        # 【重要修复】：计算损失时除以 16，实现真正、平滑的梯度累加（Mean Gradient Scaling）
-        loss = criterion(logits, label_tensor) / batch_size_target
-        loss.backward()
-        
-        batch_loss.append(loss.item() * batch_size_target) # 还原真实 loss 用于统计
-        accumulated_counter += 1
-        
-        # 凑满一个完整的 Batch，更新一次参数
-        if accumulated_counter == batch_size_target:
+            # 【重要修复】：如果两个预测的 Tau 值一样，Critic 无法判断谁好，直接跳过该样本
+            if tau1 == tau2:
+                continue
+                
+            # 数据增强：随机交换位置
+            if random.random() < 0.5:
+                predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
+                tau1, tau2 = tau2, tau1
+                
+            label = 1.0 if tau1 > tau2 else 0.0
+            label_tensor = torch.tensor([[label]], dtype=torch.float).to(DEVICE)
+            
+            # 准备输入
+            inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
+            inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) 
+            attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) 
+            token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) 
+            
+            # 前向传播得到 logits
+            logits = model(inputs_ids, attention_mask, token_type_ids) 
+            
+            # 【重要修复】：计算损失时除以 16，实现真正、平滑的梯度累加（Mean Gradient Scaling）
+            loss = criterion(logits, label_tensor) / batch_size_target
+            loss.backward()
+            
+            batch_loss.append(loss.item() * batch_size_target) # 还原真实 loss 用于统计
+            accumulated_counter += 1
+            
+            # 凑满一个完整的 Batch，更新一次参数
+            if accumulated_counter == batch_size_target:
+                optimizer.step()
+                optimizer.zero_grad()
+                accumulated_counter = 0
+                
+                writer.add_scalar(f'Loss', np.mean(batch_loss), writer.global_step)
+                batch_loss = []
+                writer.global_step += 1
+                
+        # 处理末尾不满 16 个样本残余的梯度
+        if accumulated_counter > 0:
             optimizer.step()
             optimizer.zero_grad()
-            accumulated_counter = 0
-            
-            writer.add_scalar(f'Loss', np.mean(batch_loss), writer.global_step)
-            batch_loss = []
-            writer.global_step += 1
-            
-    # 处理末尾不满 16 个样本残余的梯度
-    if accumulated_counter > 0:
-        optimizer.step()
-        optimizer.zero_grad()
-        
-    save_checkpoint(model, prefix='critic_bert', suffix='cool')
+        save_checkpoint(model, prefix='critic_bert', suffix='_epoch_{}'.format(epoch))
     return valid_trained(model)
 
 def valid_trained(model = None):
