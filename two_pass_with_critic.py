@@ -57,6 +57,8 @@ def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
 def run():
     bert1 = default_bert()
     load_checkpoint(bert1, './checkpoints/SIND_best_e1.pth' )
+    bert1.to(DEVICE)
+    bert1.eval()
     test_inputs = sind_data_prepare(sind_only_texts_get_by_split('test'))
     result = valid_bert_two_pass_plus(bert=bert1, bert_inputs=test_inputs)
     # 根据result.all_true_labels重建段落，然后根据all_predicted_labels_first和all_predicted_labels_second重建预测的段落，最后使用critic模型进行评分比较，看看是否能区分出first pass和second pass的结果差异
