@@ -1,6 +1,13 @@
 # 考察two pass的详细信息
 from two_pass_decode import *
 
+def list_equal(list1, list2):
+    if len(list1) != len(list2):
+        return False
+    for a, b in zip(list1, list2):
+        if a != b:
+            return False
+    return True
 
 def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
     if bert is None:
@@ -25,16 +32,17 @@ def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
         second_mask_token_5index_logits = np.zeros((5, 5))
         # 重排input_ids并获取新的mask_token_5index_logits
         new_input_ids = resort_token_ids(bert_input.input_ids, first_predicted_labels)
-        temp_mask_token_5index_logits = get_mask_token_5index_logits(new_input_ids, bert_input.attention_mask, bert)
+        temp_mask_token_5index_logits = get_mask_token_5index_logits(new_input_ids, bert_input.attention_mask, bert) # 5,5
         for original_indice, target_indice in enumerate(first_predicted_labels):
-            second_mask_token_5index_logits[original_indice] = temp_mask_token_5index_logits[target_indice - 1]
-        second_predicted_labels = hungarian_algorithm_best_order(second_mask_token_5index_logits.cpu().numpy())
-        if second_predicted_labels != first_predicted_labels:
+            second_mask_token_5index_logits[original_indice] = temp_mask_token_5index_logits[target_indice - 1].cpu().numpy()
+        second_predicted_labels = hungarian_algorithm_best_order(second_mask_token_5index_logits)
+        # print(first_predicted_labels, second_predicted_labels)
+        if not list_equal(second_predicted_labels, first_predicted_labels):
             if hasattr(valid_bert_two_pass_plus, "resorted_count"):
                 valid_bert_two_pass_plus.resorted_count += 1
             else:
                 valid_bert_two_pass_plus.resorted_count = 1
-        print_only_once(bert_input.input_ids, true_labels, first_predicted_labels, new_input_ids, 'XXX', second_predicted_labels)
+        # print_only_once(bert_input.input_ids, true_labels, first_predicted_labels, new_input_ids, 'XXX', second_predicted_labels)
         all_predicted_labels_first.append(first_predicted_labels)
         all_predicted_labels_second.append(second_predicted_labels)
         all_true_labels.append(true_labels)
