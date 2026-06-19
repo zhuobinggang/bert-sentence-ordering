@@ -1,7 +1,7 @@
 # 目前最好的代理： 使用aux loss，再加上打乱输入顺序三次，句子输出概率叠加
 from three_pass_random import valid_bert_three_pass_random
 from aux_loss import AuxLossBert, train_aux_loss_bert
-from sind import load_checkpoint, DEVICE, sind_data_prepare, sind_only_texts_get_by_split, valid_bert_batched
+from sind import default_test_dataloader_provider, load_checkpoint, DEVICE, sind_data_prepare, sind_only_texts_get_by_split, valid_bert_batched
 import common
 
 def train_n_repeats():
@@ -30,7 +30,7 @@ def test_one_pass():
     directory_path = Path("./checkpoints")
     search_string = '_aux_loss_repeat'
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
-    dataloader = sind_data_prepare(sind_only_texts_get_by_split('test'))
+    dataloader = default_test_dataloader_provider()
     for file in matching_files:
         model = AuxLossBert()
         # the_path = the_path or './checkpoints/SIND_best_20260616_132444_815731pair_loss_bert_best_acc.pth'
