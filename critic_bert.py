@@ -47,8 +47,8 @@ class CriticBert(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, input_ids, attention_mask):
-        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, output_hidden_states=True)  # 获取BERT的输出，直接使用最后一层的CLS向量进行分
         last_hidden_state = outputs.hidden_states[-1]  # [batch_size, seq_len, hidden_size]
         cls_hidden_state = last_hidden_state[:, 0, :]  # [batch_size, hidden_size]
         probs = self.head(cls_hidden_state)  # [batch_size, 1]
@@ -64,18 +64,21 @@ def bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_sec
     for idx, label in enumerate(predicted_label_second):
         ordered_paragraph_second[label - 1] = paragraph[idx]
     # 将ordered_paragraph_first和ordered_paragraph_second拼接送入BERT，输出first更好的概率
+    token_type_ids = []
     inputs_ids = []
     inputs_ids.append(default_tokenizer().cls_token_id)
     for sent in ordered_paragraph_first:
         tokenized = default_tokenizer()(sent, truncation=True, max_length=MAX_SENTENCE_TOKENS, add_special_tokens=False)['input_ids']
         inputs_ids.extend(tokenized)
     inputs_ids.append(default_tokenizer().sep_token_id)
+    token_type_ids.extend([0] * (len(inputs_ids)))
     for sent in ordered_paragraph_second:
         tokenized = default_tokenizer()(sent, truncation=True, max_length=MAX_SENTENCE_TOKENS, add_special_tokens=False)['input_ids']
         inputs_ids.extend(tokenized)
     inputs_ids.append(default_tokenizer().sep_token_id)
+    token_type_ids.extend([1] * (len(inputs_ids) - len(token_type_ids)))
     attention_mask = [1] * len(inputs_ids)
-    return inputs_ids, attention_mask
+    return inputs_ids, attention_mask, token_type_ids
 
 def dataset_filtered(split = 'train'):
     dataset = json.load(open(f'./temp_datasets/{split}_two_pass_results.json', 'r'))
@@ -114,15 +117,16 @@ def train():
         else:
             if random.random() < 0.5: # 随机交换first和second的顺序，增加训练的多样性
                 predicted_label_first, predicted_label_second = predicted_label_second, predicted_label_first
-            inputs_ids, attention_mask = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
+            inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
             inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) # [1, seq_len]
+            token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             # 计算label
             tau1 = cal_tau(predicted_label_first, true_label)
             tau2 = cal_tau(predicted_label_second, true_label)
             label = 1 if tau1 > tau2 else 0
             # 计算loss
-            probs = model(inputs_ids, attention_mask) # [1, 1]
+            probs = model(inputs_ids, attention_mask, token_type_ids) # [1, 1]
             square_loss = (probs - label) ** 2
             # print(square_loss.item())
             batch_loss.append(square_loss.item())
@@ -161,11 +165,12 @@ def valid_trained(model = None):
             tau1 = cal_tau(predicted_label_first, true_label)
             tau2 = cal_tau(predicted_label_second, true_label)
             label = 1 if tau1 > tau2 else 0
-            inputs_ids, attention_mask = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
+            inputs_ids, attention_mask, token_type_ids = bert_input_critic_bert(paragraph, predicted_label_first, predicted_label_second)
             inputs_ids = torch.tensor(inputs_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             attention_mask = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE) # [1, seq_len]
+            token_type_ids = torch.tensor(token_type_ids).unsqueeze(0).to(DEVICE) # [1, seq_len]
             with torch.no_grad():
-                probs = model(inputs_ids, attention_mask)
+                probs = model(inputs_ids, attention_mask, token_type_ids)
             predict = 1 if probs.item() > 0.5 else 0
             predicts.append(predict)
             labels.append(label)
