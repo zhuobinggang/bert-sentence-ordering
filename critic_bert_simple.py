@@ -1,5 +1,6 @@
 import random
 import common
+import rocs
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -51,7 +52,7 @@ def get_critic_score(critic_model, paragraph):
         score = critic_model(input_ids_t, attention_mask_t).item()
     return score
 
-def train():
+def train(sind = True, epoch = 5):
     model = CriticBert()
     model.to(DEVICE)
     model.train()
@@ -65,13 +66,14 @@ def train():
     
     # 直接读取 SIND 原文中的正确段落数据 (假设列表内每个元素都是已按正确顺序排好序的 5句话列表)
     # 如果读取出来的是无序的，请务必先根据 true_label 还原成原文章正确的顺序！
-    correct_paragraphs = sind_paragraphs('train') 
+    correct_paragraphs = sind_paragraphs('train')  if sind else rocs.dataset_get()['train']
+    prefix = 'critic_bert' + ('_sind' if sind else '_rocs')
     
     batch_size = 8 # 每次处理8个原始段落（16个输入样本）
     accumulated_loss = []
     optimizer.zero_grad()
     best_acc = 0.0
-    for epoch in range(5):
+    for epoch in range(epoch):
         for i, tgt_paragraph in enumerate(tqdm(correct_paragraphs, desc="Training Critic Pointwise")):
             # 1. 构造正样本 (Label = 1.0)
             pos_ids, pos_mask = build_bert_input(tgt_paragraph)
@@ -113,7 +115,7 @@ def train():
         if acc > best_acc:
             print(f"New best accuracy: {acc:.4f}, save model checkpoint")
             best_acc = acc
-            save_checkpoint(model, prefix='critic_bert', suffix='pointwise_best')
+            save_checkpoint(model, prefix=prefix, suffix='pointwise_best')
 
 def default_critic_model():
     model = CriticBert()
