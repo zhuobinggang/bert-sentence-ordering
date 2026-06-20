@@ -73,14 +73,7 @@ def test_get_top_k_permutations_from_matrix():
         print(f"Critic Score for Permutation {idx+1}: {score}")
 
 @torch.no_grad()
-def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
-    if sind:
-        print('使用 sind 数据集进行验证...')
-        paragraphs = sind_paragraphs(split)
-    else:
-        print('使用 rocs 数据集进行验证...')
-        import rocs
-        paragraphs = rocs.dataset_get()[split]
+def valid_bert_top5_with_critic(bert, critic, paragraphs):
     all_predicted_labels = []
     all_true_labels = []
     printed = True # 不用打印了
@@ -119,8 +112,11 @@ def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
     test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
     return test_result
 
-def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
+def valid_trained_in_folder(sind = True):
+    import rocs
+    search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
     critic = default_critic_model_sind() if sind else default_critic_model_rocs()
+    paragraphs = sind_paragraphs('test') if sind else rocs.dataset_get()['test']
     from pathlib import Path
     directory_path = Path("./checkpoints")
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
@@ -133,7 +129,7 @@ def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
         load_checkpoint(bert, str(file))
         bert.to(DEVICE)
         bert.eval()
-        result = valid_bert_top5_with_critic(bert, critic, 'test', sind=sind)
+        result = valid_bert_top5_with_critic(bert, critic, paragraphs)
         taus.append(result.tau)
         accs.append(result.acc)
         pmrs.append(result.pmr)
@@ -145,14 +141,3 @@ def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
     common.cal_mean_std(accs)
     print('PMRs:')
     common.cal_mean_std(pmrs)
-
-def valid_sind():
-    valid_trained_in_folder(search_string = '_vanilla_sind_')
-
-def valid_rocs():
-    valid_trained_in_folder(search_string = '_vanilla_rocs_', sind=False)
-
-
-def valid_all():
-    valid_sind()
-    valid_rocs()
