@@ -115,6 +115,12 @@ def train():
             best_acc = acc
             save_checkpoint(model, prefix='critic_bert', suffix='pointwise_best')
 
+def default_critic_model():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_bert_pointwise_good.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
 
 def valid_trained(model = None):
     if model is None:

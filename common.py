@@ -55,3 +55,9 @@ def get_writer(base_log_dir="runs"):
     writer = SummaryWriter(log_dir=log_dir)
     writer.global_step = 0
     return writer
+
+def cal_mean_std(scores):
+    import numpy as np
+    std_np = np.std(scores, ddof=1)
+    mean_np = np.mean(scores)
+    print(f"Numpy: {mean_np:.4f} ± {std_np:.4f}")
