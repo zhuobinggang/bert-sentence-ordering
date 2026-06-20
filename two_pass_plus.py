@@ -1,13 +1,7 @@
 # 考察two pass的详细信息
 from two_pass_decode import *
+from common import list_equal
 
-def list_equal(list1, list2):
-    if len(list1) != len(list2):
-        return False
-    for a, b in zip(list1, list2):
-        if a != b:
-            return False
-    return True
 
 def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
     if bert is None:

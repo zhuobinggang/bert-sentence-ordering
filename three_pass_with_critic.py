@@ -1,6 +1,7 @@
 from two_pass_plus import *
 from critic_bert_simple import *
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
+from common import list_equal, list_in
 
 def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3, paragraphs = None):
     if paragraphs is None:
@@ -12,6 +13,7 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3,
         best_critic_score = float('-inf')
         best_predicted_labels = None
         labels = None
+        predicted_labels = [] # 存储每次解码的 predicted_labels，如果已经有了，就不再评分了
         # npass次解码
         for _ in range(npass):
             random_labels  = add_one(random.sample(range(5), 5))
@@ -19,12 +21,14 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3,
             bert_input = create_bert_input_for_shuffled_paragraph(random_paragraph, random_labels)
             temp_mask_token_5index_logits = get_mask_token_5index_logits(bert_input.input_ids, bert_input.attention_mask, bert)
             temp_predicted_labels = hungarian_algorithm_best_order(temp_mask_token_5index_logits.cpu().numpy())
-            temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
-            critic_score = get_critic_score(critic, temp_resorted_paragraph)
-            if critic_score > best_critic_score:
-                best_critic_score = critic_score
-                best_predicted_labels = temp_predicted_labels
-                labels = random_labels
+            if not list_in(temp_predicted_labels, predicted_labels): # 性能优化：如果已经有了，就不再评分了
+                predicted_labels.append(temp_predicted_labels)
+                temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
+                critic_score = get_critic_score(critic, temp_resorted_paragraph)
+                if critic_score > best_critic_score:
+                    best_critic_score = critic_score
+                    best_predicted_labels = temp_predicted_labels
+                    labels = random_labels
             if not printed:
                 print(f'Original paragraph: {paragraph}')
                 print(f"Random shuffled paragraph: {random_paragraph}")

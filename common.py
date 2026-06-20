@@ -61,3 +61,18 @@ def cal_mean_std(scores):
     std_np = np.std(scores, ddof=1)
     mean_np = np.mean(scores)
     print(f"Numpy: {mean_np:.4f} ± {std_np:.4f}")
+
+def list_equal(list1, list2):
+    if len(list1) != len(list2):
+        return False
+    for a, b in zip(list1, list2):
+        if a != b:
+            return False
+    return True
+
+def list_in(a, container):
+    for b in container:
+        if list_equal(a, b):
+            return True
+    return False
+    
