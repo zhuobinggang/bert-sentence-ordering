@@ -38,13 +38,6 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3)
     test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
     return test_result
 
-def default_trained_critic():
-    critic = CriticBert()
-    load_checkpoint(critic, './checkpoints/critic_bert_pointwise_good.pth')
-    critic.to(DEVICE)
-    critic.eval()
-    return critic
-
 def default_trained_bert():
     bert = default_bert()
     load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
@@ -53,12 +46,12 @@ def default_trained_bert():
     return bert
 
 def valid_trained():
-    critic = default_trained_critic()
+    critic = default_critic_model()
     bert = default_trained_bert()
     valid_bert_n_pass_random_with_critic(bert, critic, 'test', npass=3)
     
 def valid_trained_in_folder(search_string = '_vanilla_sind_'):
-    critic = default_trained_critic()
+    critic = default_critic_model()
     from pathlib import Path
     directory_path = Path("./checkpoints")
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]

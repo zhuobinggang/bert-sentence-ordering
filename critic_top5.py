@@ -3,6 +3,8 @@ from critic_bert_simple import get_critic_score, default_critic_model
 import itertools
 import math
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
+from sind import sind_only_texts_get_by_split
+from two_pass_plus import *
 
 def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
     """
@@ -47,7 +49,7 @@ def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
     return top_k_permutations
 
 
-def run():
+def test_get_top_k_permutations_from_matrix():
     critic_model = default_critic_model()
     # 这里假设 prob_matrix 是从 bert1 模型输出的 5x5 位置概率矩阵
     prob_matrix = [
@@ -68,3 +70,56 @@ def run():
         print(f"Resorted Paragraph: {paragraph}")
         score = get_critic_score(critic_model, paragraph)
         print(f"Critic Score for Permutation {idx+1}: {score}")
+
+def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
+    if sind:
+        paragraphs = sind_only_texts_get_by_split(split)
+    else:
+        raise NotImplementedError("Currently only supports SIND dataset.")
+    all_predicted_labels = []
+    all_true_labels = []
+    printed = False
+    for paragraph in tqdm(paragraphs):
+        best_critic_score = float('-inf')
+        best_predicted_labels = None
+        # npass次解码
+        random_labels  = add_one(random.sample(range(5), 5))
+        labels = random_labels # 反正都是随机的，直接用这个作为 true label
+        random_paragraph = recover_unsorted_paragraph(paragraph, random_labels)
+        bert_input = create_bert_input_for_shuffled_paragraph(random_paragraph, random_labels)
+        mask_token_5index_logits = get_mask_token_5index_logits(bert_input.input_ids, bert_input.attention_mask, bert)
+        top5 = get_top_k_permutations_from_matrix(mask_token_5index_logits.cpu().numpy(), top_k=5)
+        for temp_predicted_labels in top5:
+            temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
+            critic_score = get_critic_score(critic, temp_resorted_paragraph)
+            if critic_score > best_critic_score:
+                best_critic_score = critic_score
+                best_predicted_labels = temp_predicted_labels
+                # labels = random_labels
+            if not printed:
+                print(f'Original paragraph: {paragraph}')
+                print(f"Random shuffled paragraph: {random_paragraph}")
+                print(f"True label: {random_labels}")
+                print(f"Predicted label: {temp_predicted_labels}")
+                print(f"Resorted paragraph: {temp_resorted_paragraph}")
+                print(f"Critic score: {critic_score}")
+                printed = True
+            all_predicted_labels.append(best_predicted_labels)
+            all_true_labels.append(labels)
+    # 在修正标签之前计算一次
+    test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
+    return test_result
+
+def valid_trained_in_folder(search_string = '_vanilla_sind_'):
+    critic = default_critic_model()
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    for file in matching_files:
+        bert = default_bert()
+        load_checkpoint(bert, str(file))
+        bert.to(DEVICE)
+        bert.eval()
+        result = valid_bert_top5_with_critic(bert, critic, 'test', sind=True)
+        print(f'Model {file}, Test Result: {result}')
+        common.logging.warning(f'Model {file}, Test Result: {result}')
