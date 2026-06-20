@@ -5,6 +5,7 @@ import math
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
 from sind import sind_paragraphs
 from two_pass_plus import *
+import common
 
 def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
     """
@@ -123,6 +124,9 @@ def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
     from pathlib import Path
     directory_path = Path("./checkpoints")
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    taus = []
+    accs = []
+    pmrs = []
     for file in matching_files:
         print(f'Validating model: {file}')
         bert = default_bert()
@@ -130,8 +134,17 @@ def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
         bert.to(DEVICE)
         bert.eval()
         result = valid_bert_top5_with_critic(bert, critic, 'test', sind=sind)
+        taus.append(result.tau)
+        accs.append(result.acc)
+        pmrs.append(result.pmr)
         print(f'Model {file}, Test Result: {result}')
         common.logging.warning(f'Model {file}, Test Result: {result}')
+    print('Taus:')
+    common.cal_mean_std(taus)
+    print('Accs:')
+    common.cal_mean_std(accs)
+    print('PMRs:')
+    common.cal_mean_std(pmrs)
 
 def valid_sind():
     valid_trained_in_folder(search_string = '_vanilla_sind_')
