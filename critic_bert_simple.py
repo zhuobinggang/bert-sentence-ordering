@@ -119,22 +119,21 @@ def train(sind = True, epoch = 5):
 
 def default_critic_model_sind():
     model = CriticBert()
-    load_checkpoint(model, 'checkpoints/critic_bert_pointwise_good.pth')
+    load_checkpoint(model, 'checkpoints/critic_sind_default.pth')
     model.to(DEVICE)
     model.eval()
     return model
 
 def default_critic_model_rocs():
     model = CriticBert()
-    load_checkpoint(model, 'checkpoints/critic_bert_rocs_pointwise_good.pth')
+    load_checkpoint(model, 'checkpoints/critic_rocs_default.pth')
     model.to(DEVICE)
     model.eval()
     return model
 
 def valid_trained(model = None):
     if model is None:
-        model = CriticBert()
-        load_checkpoint(model, 'checkpoints/critic_bert_pointwise_best.pth')
+        model = default_critic_model_sind()
     model.to(DEVICE)
     model.eval()
     
