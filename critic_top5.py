@@ -71,6 +71,7 @@ def test_get_top_k_permutations_from_matrix():
         score = get_critic_score(critic_model, paragraph)
         print(f"Critic Score for Permutation {idx+1}: {score}")
 
+@torch.no_grad()
 def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
     if sind:
         print('使用 sind 数据集进行验证...')
@@ -81,7 +82,7 @@ def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
         paragraphs = rocs.dataset_get()[split]
     all_predicted_labels = []
     all_true_labels = []
-    printed = False
+    printed = True # 不用打印了
     for paragraph in tqdm(paragraphs):
         best_critic_score = float('-inf')
         best_predicted_labels = None
@@ -91,7 +92,11 @@ def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
         random_paragraph = recover_unsorted_paragraph(paragraph, random_labels)
         bert_input = create_bert_input_for_shuffled_paragraph(random_paragraph, random_labels)
         mask_token_5index_logits = get_mask_token_5index_logits(bert_input.input_ids, bert_input.attention_mask, bert)
-        top5 = get_top_k_permutations_from_matrix(mask_token_5index_logits.cpu().numpy(), top_k=5)
+        # 1. 先在最后一维（位置维）做 Softmax，把网络输出的 Logits 压制到 0~1 的概率区间
+        prob_matrix_tensor = torch.softmax(mask_token_5index_logits, dim=-1)
+        # 2. 然后再转换成 numpy 数组送入 top-k 函数
+        prob_matrix_numpy = prob_matrix_tensor.cpu().numpy()
+        top5 = get_top_k_permutations_from_matrix(prob_matrix_numpy, top_k=5)
         for temp_predicted_labels in top5:
             temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
             critic_score = get_critic_score(critic, temp_resorted_paragraph)
@@ -133,3 +138,8 @@ def valid_sind():
 
 def valid_rocs():
     valid_trained_in_folder(search_string = '_vanilla_rocs_', sind=False)
+
+
+def valid_all():
+    valid_sind()
+    valid_rocs()
