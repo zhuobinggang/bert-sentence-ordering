@@ -29,21 +29,26 @@ def dataset_get():
     train_ds = paragraphs[:int(0.8*len(paragraphs))]
     val_ds = paragraphs[int(0.8*len(paragraphs)):int(0.9*len(paragraphs))]
     test_ds = paragraphs[int(0.9*len(paragraphs)):]
-    return train_ds, val_ds, test_ds
+    return {
+        'train': train_ds,
+        'val': val_ds,
+        'test': test_ds
+    }
+
 
 def train_dataloader_provider():
     print('重新制备训练数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[0]))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()['train']))
 
 @lru_cache(maxsize=1)
 def val_dataloader_provider():
     print('重新制备验证数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[1]))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()['val']))
 
 @lru_cache(maxsize=1)
 def test_dataloader_provider():
     print('重新制备测试数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()[2]))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(dataset_get()['test']))
 
 def train_rocs():
     _ = train(epochs=5, suffix='_rocs', trian_dataloader_provider=train_dataloader_provider, val_dataloader_provider=val_dataloader_provider)
@@ -63,5 +68,5 @@ def test_two_pass():
     from two_pass_decode import valid_bert_two_pass
     bert = default_bert()
     load_checkpoint(bert, './checkpoints/SIND_best_20260612_175823_366716_rocs_best_acc.pth' )
-    bert_inputs = sind_data_prepare(dataset_get()[2])
+    bert_inputs = sind_data_prepare(dataset_get()['test'])
     valid_bert_two_pass(bert, None, bert_inputs)

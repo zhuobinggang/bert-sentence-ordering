@@ -8,7 +8,7 @@ def valid_bert_three_pass_random(bert = None, split = 'val', bert_inputs = None)
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if bert_inputs is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []

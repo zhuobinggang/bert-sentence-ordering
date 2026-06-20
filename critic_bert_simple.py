@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 from sind import save_checkpoint, load_checkpoint
 # 假设你的基础函数库
-from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_only_texts_get_by_split
+from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_paragraphs
 
 MAX_SENTENCE_TOKENS = 50
 
@@ -65,7 +65,7 @@ def train():
     
     # 直接读取 SIND 原文中的正确段落数据 (假设列表内每个元素都是已按正确顺序排好序的 5句话列表)
     # 如果读取出来的是无序的，请务必先根据 true_label 还原成原文章正确的顺序！
-    correct_paragraphs = sind_only_texts_get_by_split('train') 
+    correct_paragraphs = sind_paragraphs('train') 
     
     batch_size = 8 # 每次处理8个原始段落（16个输入样本）
     accumulated_loss = []
@@ -129,7 +129,7 @@ def valid_trained(model = None):
     model.to(DEVICE)
     model.eval()
     
-    val_paragraphs = sind_only_texts_get_by_split('val')
+    val_paragraphs = sind_paragraphs('val')
     correct_count = 0
     total_count = 0
     

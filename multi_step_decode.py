@@ -28,7 +28,7 @@ def valid_bert_n_steps(bert = None, split = 'val', num_samples=None, n_steps=2):
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     if num_samples is not None:
         paragraphs = paragraphs[:num_samples]
     bert_inputs = sind_data_prepare(paragraphs)

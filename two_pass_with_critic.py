@@ -3,7 +3,7 @@ from critic_bert_simple import *
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
 
 def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3):
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     all_predicted_labels = []
     all_true_labels = []
     printed = False
