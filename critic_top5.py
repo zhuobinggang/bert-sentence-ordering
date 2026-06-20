@@ -1,5 +1,5 @@
 # 从概率矩阵中找到top5序列，然后用critic模型计算reward
-from critic_bert_simple import get_critic_score, default_critic_model
+from critic_bert_simple import get_critic_score, default_critic_model_sind, default_critic_model_rocs
 import itertools
 import math
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
@@ -50,7 +50,7 @@ def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
 
 
 def test_get_top_k_permutations_from_matrix():
-    critic_model = default_critic_model()
+    critic_model = default_critic_model_sind()
     # 这里假设 prob_matrix 是从 bert1 模型输出的 5x5 位置概率矩阵
     prob_matrix = [
         [0.1, 0.2, 0.3, 0.25, 0.15],
@@ -119,7 +119,7 @@ def valid_bert_top5_with_critic(bert, critic, split = 'val', sind=True):
     return test_result
 
 def valid_trained_in_folder(search_string = '_vanilla_sind_', sind = True):
-    critic = default_critic_model()
+    critic = default_critic_model_sind() if sind else default_critic_model_rocs()
     from pathlib import Path
     directory_path = Path("./checkpoints")
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]

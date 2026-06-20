@@ -117,9 +117,16 @@ def train(sind = True, epoch = 5):
             best_acc = acc
             save_checkpoint(model, prefix=prefix, suffix='pointwise_best')
 
-def default_critic_model():
+def default_critic_model_sind():
     model = CriticBert()
     load_checkpoint(model, 'checkpoints/critic_bert_pointwise_good.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
+
+def default_critic_model_rocs():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_bert_rocs_pointwise_good.pth')
     model.to(DEVICE)
     model.eval()
     return model

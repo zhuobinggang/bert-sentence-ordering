@@ -46,12 +46,12 @@ def default_trained_bert():
     return bert
 
 def valid_trained():
-    critic = default_critic_model()
+    critic = default_critic_model_sind()
     bert = default_trained_bert()
     valid_bert_n_pass_random_with_critic(bert, critic, 'test', npass=3)
     
 def valid_trained_in_folder(search_string = '_vanilla_sind_'):
-    critic = default_critic_model()
+    critic = default_critic_model_sind()
     from pathlib import Path
     directory_path = Path("./checkpoints")
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
