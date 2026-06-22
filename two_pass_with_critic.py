@@ -72,4 +72,17 @@ def valid_trained_in_folder(search_string = '_vanilla_sind_'):
         common.logging.warning(f'Model {file}, Test Result: {result}')
 
 def valid_trained_aux_loss_model_in_folder():
-    valid_trained_in_folder(search_string  = '_aux_loss_repeat_')
+    from aux_loss import AuxLossBert
+    search_string  = '_aux_loss_repeat_'
+    critic = default_trained_critic()
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    for file in matching_files:
+        model = AuxLossBert()
+        load_checkpoint(model, str(file))
+        model.to(DEVICE)
+        model.eval()
+        result = valid_bert_n_pass_random_with_critic(model.bert, critic, 'test', npass=3)
+        print(f'Model {file}, Test Result: {result}')
+        common.logging.warning(f'Model {file}, Test Result: {result}')
