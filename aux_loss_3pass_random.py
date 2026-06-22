@@ -1,7 +1,7 @@
 # 目前最好的代理： 使用aux loss，再加上打乱输入顺序三次，句子输出概率叠加
 from three_pass_random import valid_bert_three_pass_random
 from aux_loss import AuxLossBert, train_aux_loss_bert
-from sind import default_test_dataloader_provider, load_checkpoint, DEVICE, sind_data_prepare, sind_only_texts_get_by_split, valid_bert_batched
+from sind import default_test_dataloader_provider, load_checkpoint, DEVICE, sind_data_prepare, sind_paragraphs, valid_bert_batched
 import common
 
 def train_n_repeats():

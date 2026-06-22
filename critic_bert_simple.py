@@ -1,12 +1,13 @@
 import random
 import common
+import rocs
 import torch
 from torch import nn
 from tqdm import tqdm
 import numpy as np
 from sind import save_checkpoint, load_checkpoint
 # 假设你的基础函数库
-from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_only_texts_get_by_split
+from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_paragraphs
 
 MAX_SENTENCE_TOKENS = 50
 
@@ -51,7 +52,7 @@ def get_critic_score(critic_model, paragraph):
         score = critic_model(input_ids_t, attention_mask_t).item()
     return score
 
-def train():
+def train(sind = True, epoch = 5):
     model = CriticBert()
     model.to(DEVICE)
     model.train()
@@ -65,13 +66,14 @@ def train():
     
     # 直接读取 SIND 原文中的正确段落数据 (假设列表内每个元素都是已按正确顺序排好序的 5句话列表)
     # 如果读取出来的是无序的，请务必先根据 true_label 还原成原文章正确的顺序！
-    correct_paragraphs = sind_only_texts_get_by_split('train') 
+    correct_paragraphs = sind_paragraphs('train')  if sind else rocs.dataset_get()['train']
+    prefix = 'critic_bert' + ('_sind' if sind else '_rocs')
     
     batch_size = 8 # 每次处理8个原始段落（16个输入样本）
     accumulated_loss = []
     optimizer.zero_grad()
     best_acc = 0.0
-    for epoch in range(5):
+    for epoch in range(epoch):
         for i, tgt_paragraph in enumerate(tqdm(correct_paragraphs, desc="Training Critic Pointwise")):
             # 1. 构造正样本 (Label = 1.0)
             pos_ids, pos_mask = build_bert_input(tgt_paragraph)
@@ -113,17 +115,29 @@ def train():
         if acc > best_acc:
             print(f"New best accuracy: {acc:.4f}, save model checkpoint")
             best_acc = acc
-            save_checkpoint(model, prefix='critic_bert', suffix='pointwise_best')
+            save_checkpoint(model, prefix=prefix, suffix='pointwise_best')
 
+def default_critic_model_sind():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_sind_default.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
+
+def default_critic_model_rocs():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_rocs_default.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
 
 def valid_trained(model = None):
     if model is None:
-        model = CriticBert()
-        load_checkpoint(model, 'checkpoints/critic_bert_pointwise_best.pth')
+        model = default_critic_model_sind()
     model.to(DEVICE)
     model.eval()
     
-    val_paragraphs = sind_only_texts_get_by_split('val')
+    val_paragraphs = sind_paragraphs('val')
     correct_count = 0
     total_count = 0
     

@@ -12,7 +12,7 @@ def valid_bert_batched_decode(bert = None, split = 'val', split_length = None, d
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if dataloader is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         if split_length is not None:
             common.print_once(f"只使用{split}前{split_length}个故事进行验证")
             paragraphs = paragraphs[:split_length]

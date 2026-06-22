@@ -51,7 +51,7 @@ def calculate_dataset_length_ROCS():
 # 'Dad manned the grill.', 
 # 'There was so much food and it was all delicious.', 
 # 'We ended the day shooting off some fireworks.']
-def sind_only_texts_get_by_split(split):
+def sind_paragraphs(split):
     only_texts = []
     the_path = os.path.join(common.dataset_base, f'SIND/{split}.story-in-sequence.json')
     print(f"Loading SIND dataset from {the_path}...")
@@ -192,12 +192,12 @@ def sind_data_prepare(paragraphs, random_mask_count = 5, need_shuffle = True):
     return results
 
 def input_ids_for_test():
-    paragraphs = sind_only_texts_get_by_split('val')[:1]
+    paragraphs = sind_paragraphs('val')[:1]
     results = sind_data_prepare(paragraphs)
     return results[0]
 
 def test():
-    paragraphs = sind_only_texts_get_by_split('val')[:5]
+    paragraphs = sind_paragraphs('val')[:5]
     results = sind_data_prepare(paragraphs)
     for item in results:
         print(item)
@@ -303,7 +303,7 @@ def valid_bert_keep_repeated(bert = None, split = 'val'):
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
@@ -332,7 +332,7 @@ def valid_bert_batched_keep_repeated(bert = None, split = 'val', split_length = 
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if dataloader is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         if split_length is not None:
             common.print_once(f"只使用{split}前{split_length}个故事进行验证")
             paragraphs = paragraphs[:split_length]
@@ -400,7 +400,7 @@ def valid_bert_batched(bert = None, split = 'val', split_length = None, dataload
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if dataloader is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         if split_length is not None:
             common.print_once(f"只使用{split}前{split_length}个故事进行验证")
             paragraphs = paragraphs[:split_length]
@@ -442,7 +442,7 @@ def valid_bert(bert = None, split = 'val'):
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels = []
@@ -463,7 +463,7 @@ def valid_bert(bert = None, split = 'val'):
     return test_result
 
 def calculate_random_baseline(split):
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     all_true_labels = []
     all_predicted_labels = []
     for paragraph in paragraphs:
@@ -477,7 +477,7 @@ def calculate_random_baseline(split):
     return test_result
 
 def calculate_all_one_baseline(split):
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     all_true_labels = []
     all_predicted_labels = []
     for paragraph in paragraphs:
@@ -508,17 +508,17 @@ def load_checkpoint(bert, path):
 
 def default_trian_dataloader_provider():
     print('重新制备训练数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('train')))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_paragraphs('train')))
 
 @lru_cache(maxsize=1) # 只缓存验证数据集，训练数据集每次都重新制备，增加随机性
 def default_val_dataloader_provider():
     print('重新制备验证数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('val')))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_paragraphs('val')))
 
 @lru_cache(maxsize=1) # 只缓存验证数据集，训练数据集每次都重新制备，增加随机性
 def default_test_dataloader_provider():
     print('重新制备测试数据集...')
-    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_only_texts_get_by_split('test')))
+    return bert_inputs_to_dataloader_shuffle(sind_data_prepare(sind_paragraphs('test')))
 
 def train(epochs = 5, suffix = '', 
           trian_dataloader_provider = default_trian_dataloader_provider, 

@@ -1,13 +1,7 @@
 # 考察two pass的详细信息
 from two_pass_decode import *
+from common import list_equal
 
-def list_equal(list1, list2):
-    if len(list1) != len(list2):
-        return False
-    for a, b in zip(list1, list2):
-        if a != b:
-            return False
-    return True
 
 def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
     if bert is None:
@@ -15,7 +9,7 @@ def valid_bert_two_pass_plus(bert = None, split = 'val', bert_inputs = None):
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if bert_inputs is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels_first = []
@@ -68,7 +62,7 @@ def valid_bert_two_pass_average(bert = None, split = 'val', bert_inputs = None):
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
     if bert_inputs is None:
-        paragraphs = sind_only_texts_get_by_split(split)
+        paragraphs = sind_paragraphs(split)
         bert_inputs = sind_data_prepare(paragraphs)
     # 然后使用默认的BERT模型进行解码，计算准确率和tau值
     all_predicted_labels_first = []
@@ -138,7 +132,7 @@ def test_two_pass():
     bert = default_bert()
     load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
     # valid_bert(bert, 'test')
-    test_inputs = sind_data_prepare(sind_only_texts_get_by_split('test'))
+    test_inputs = sind_data_prepare(sind_paragraphs('test'))
     result = valid_bert_two_pass_plus(bert=bert, bert_inputs=test_inputs)
     # print(f"Number of samples that were resorted: {getattr(valid_bert_two_pass_plus, 'resorted_count', 0)}")
     cal_confident_results(result['all_predicted_labels_first'], result['all_predicted_labels_second'], result['all_true_labels'])

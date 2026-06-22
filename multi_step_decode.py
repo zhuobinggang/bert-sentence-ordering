@@ -28,7 +28,7 @@ def valid_bert_n_steps(bert = None, split = 'val', num_samples=None, n_steps=2):
         bert = default_bert()
     # 首先将val数据集转换成BertInput格式
     # paragraphs = sind_only_texts_get_by_split('val')[:100] # 取前100个故事进行测试
-    paragraphs = sind_only_texts_get_by_split(split)
+    paragraphs = sind_paragraphs(split)
     if num_samples is not None:
         paragraphs = paragraphs[:num_samples]
     bert_inputs = sind_data_prepare(paragraphs)
@@ -51,6 +51,7 @@ def valid_bert_n_steps(bert = None, split = 'val', num_samples=None, n_steps=2):
         all_predicted_labels.append(step_predicted_labels)
         all_true_labels.append(step_true_labels)
     # assert len(all_predicted_labels) == n_steps * len(bert_inputs), "预测标签数量应该是输入数量的两倍"
+    # test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
     return all_predicted_labels, all_true_labels
 
 def valid_bert_n_steps_flatten_acc(bert = None, split = 'val', num_samples=100, n_steps=2):
@@ -58,6 +59,13 @@ def valid_bert_n_steps_flatten_acc(bert = None, split = 'val', num_samples=100, 
     all_predicted_labels = [a for nest_list in all_predicted_labels for a in nest_list] # 过滤掉无法预测的标签
     all_true_labels = [a for nest_list in all_true_labels for a in nest_list]
     print(cal_acc(all_predicted_labels, all_true_labels))
+
+def valid_bert_5_steps(bert = None, split = 'val', num_samples=None):
+    all_predicted_labels, all_true_labels = valid_bert_n_steps(bert, split, num_samples, n_steps=5)
+    all_predicted_labels = [a for nest_list in all_predicted_labels for a in nest_list] # 过滤掉无法预测的标签
+    all_true_labels = [a for nest_list in all_true_labels for a in nest_list]
+    print(cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False))
+
 
 # Example usage
 # 1-step decoding accuracy: 0.88
