@@ -1,5 +1,5 @@
 # 考察n pass的信息
-from n_pass_with_critic import *
+from critic_randomk import *
 import common
 
 def run():

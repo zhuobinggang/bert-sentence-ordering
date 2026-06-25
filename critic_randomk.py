@@ -64,7 +64,7 @@ def valid_trained():
     bert = default_trained_bert()
     valid_bert_n_pass_random_with_critic(bert, critic, 'test', npass=3)
     
-def valid_trained_in_folder(sind = True):
+def valid_trained_in_folder(sind = True, npass = 3):
     search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
     matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
     critic = default_critic_model_sind() if sind else default_critic_model_rocs()
@@ -77,7 +77,7 @@ def valid_trained_in_folder(sind = True):
         load_checkpoint(bert, str(file))
         bert.to(DEVICE)
         bert.eval()
-        result = valid_bert_n_pass_random_with_critic(bert, critic, split='do_not_use', npass=3, paragraphs=paragraphs)
+        result = valid_bert_n_pass_random_with_critic(bert, critic, split='do_not_use', npass=npass, paragraphs=paragraphs)
         taus.append(result.tau)
         accs.append(result.acc)
         pmrs.append(result.pmr)
