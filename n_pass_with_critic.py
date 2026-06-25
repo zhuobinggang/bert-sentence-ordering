@@ -3,7 +3,7 @@ from critic_bert_simple import *
 from critic_bert import resort_paragraph, recover_unsorted_paragraph
 from common import list_equal, list_in
 
-def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3, paragraphs = None):
+def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3, paragraphs = None, output_details = False):
     if paragraphs is None:
         paragraphs = sind_paragraphs(split)
     all_predicted_labels = []
@@ -41,11 +41,20 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3,
         all_true_labels.append(labels)
     # 在修正标签之前计算一次
     test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
-    return test_result
+    if not output_details:
+        return test_result
+    else:
+        return {
+            'tau': test_result.tau,
+            'acc': test_result.acc,
+            'pmr': test_result.pmr,
+            'all_predicted_labels': all_predicted_labels,
+            'all_true_labels': all_true_labels
+        }
 
-def default_trained_bert():
+def default_trained_bert(path = './checkpoints/SIND_best_e1.pth'):
     bert = default_bert()
-    load_checkpoint(bert, './checkpoints/SIND_best_e1.pth' )
+    load_checkpoint(bert, path)
     bert.to(DEVICE)
     bert.eval()
     return bert
@@ -57,14 +66,12 @@ def valid_trained():
     
 def valid_trained_in_folder(sind = True):
     search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
+    matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
     critic = default_critic_model_sind() if sind else default_critic_model_rocs()
     paragraphs = sind_paragraphs('test') if sind else rocs.dataset_get()['test']
     taus = []
     accs = []
     pmrs = []
-    from pathlib import Path
-    directory_path = Path("./checkpoints")
-    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     for file in matching_files:
         bert = default_bert()
         load_checkpoint(bert, str(file))

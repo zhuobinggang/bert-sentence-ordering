@@ -73,7 +73,7 @@ def test_get_top_k_permutations_from_matrix():
         print(f"Critic Score for Permutation {idx+1}: {score}")
 
 @torch.no_grad()
-def valid_bert_top5_with_critic(bert, critic, paragraphs):
+def valid_bert_top5_with_critic(bert, critic, paragraphs, top_k=5):
     all_predicted_labels = []
     all_true_labels = []
     printed = True # 不用打印了
@@ -90,7 +90,7 @@ def valid_bert_top5_with_critic(bert, critic, paragraphs):
         prob_matrix_tensor = torch.softmax(mask_token_5index_logits, dim=-1)
         # 2. 然后再转换成 numpy 数组送入 top-k 函数
         prob_matrix_numpy = prob_matrix_tensor.cpu().numpy()
-        top5 = get_top_k_permutations_from_matrix(prob_matrix_numpy, top_k=5)
+        top5 = get_top_k_permutations_from_matrix(prob_matrix_numpy, top_k=top_k)
         for temp_predicted_labels in top5:
             temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
             critic_score = get_critic_score(critic, temp_resorted_paragraph)
@@ -112,7 +112,7 @@ def valid_bert_top5_with_critic(bert, critic, paragraphs):
     test_result = cal_tau_acc_pmr(all_predicted_labels, all_true_labels, need_fix = False)
     return test_result
 
-def valid_trained_in_folder(sind = True):
+def valid_trained_in_folder(sind = True, top_k=3):
     import rocs
     search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
     critic = default_critic_model_sind() if sind else default_critic_model_rocs()
@@ -129,7 +129,7 @@ def valid_trained_in_folder(sind = True):
         load_checkpoint(bert, str(file))
         bert.to(DEVICE)
         bert.eval()
-        result = valid_bert_top5_with_critic(bert, critic, paragraphs)
+        result = valid_bert_top5_with_critic(bert, critic, paragraphs, top_k=top_k)
         taus.append(result.tau)
         accs.append(result.acc)
         pmrs.append(result.pmr)

@@ -76,3 +76,9 @@ def list_in(a, container):
             return True
     return False
     
+# use str(matching_file) to get the path string
+def search_files_in_directory(search_string, directory="./checkpoints"):
+    from pathlib import Path
+    directory_path = Path(directory)
+    matching_file_abs_paths = [str(file) for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    return matching_file_abs_paths
