@@ -10,3 +10,6 @@ twc_games
 *\.pth
 \.~*
 runs/
+*\.eps
+*\.pdf
+*\.png
