@@ -62,16 +62,16 @@ def sind():
 def double_draw():
     # ==================== 1. 数据准备 ====================
     # ROCStory 数据
-    labels_roc = ['BERT4SO', 'BERSON', 'Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic']
-    x_roc = [1.0, 7.95, 1.0, 4.0, 4.0, 6.0]
-    y_roc = [0.8487, 0.88, 0.8518, 0.8541, 0.8593, 0.8622]
+    labels_roc = ['BERT4SO', 'BERSON', 'Direct MLM',  'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    x_roc = [1.0, 7.95, 1.0, 4.0, 6.0, 8.0]
+    y_roc = [0.8487, 0.88, 0.8518, 0.8593, 0.8622, 0.8633]
 
     # SIND 数据
-    labels_sind = ['BERT4SO', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic']
-    x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 4.0, 6.0]
-    y_sind = [0.5998, 0.65, 0.67, 0.5900, 0.5967, 0.5986, 0.6048]
+    labels_sind = ['BERT4SO', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 6.0, 8.0]
+    y_sind = [0.5998, 0.65, 0.67, 0.5900, 0.5986, 0.6048, 0.6054]
 
-    our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic']
+    our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
 
 
     # ==================== 2. 创建画布 ====================
@@ -139,3 +139,89 @@ def double_draw():
     # 保存为符合 LaTeX 学术规范的 PDF 格式
     plt.savefig('datasets_comparison.eps', bbox_inches='tight')
     print("PDF 图表已成功生成并保存在当前目录下！")
+
+
+def double_draw_critic_strategy():
+    import matplotlib.pyplot as plt
+
+    # ==================== 1. 数据准备 ====================
+    # ROCStory 数据
+    labels_roc = ['Direct MLM', 'Top-3 critic', 'Top-5 critic', 'Top-7 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    x_roc = [1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
+    y_roc = [0.8518, 0.8541, 0.8519, 0.8496, 0.8593, 0.8622, 0.8633]
+
+    # SIND 数据
+    labels_sind = ['Direct MLM', 'Top-3 critic', 'Top-5 critic', 'Top-7 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    x_sind = [1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
+    y_sind = [0.5900, 0.5967, 0.5975, 0.5983, 0.5986, 0.6048, 0.6054]
+
+    # 手法分类与对应的标记符号（Markers）
+    o_methods = ['Direct MLM']
+    square_methods = ['Top-3 critic', 'Top-5 critic', 'Top-7 critic']
+    triangle_methods = ['Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+
+    # ==================== 2. 创建画布 ====================
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+
+    # ==================== 3. 子图绘制函数 ====================
+    def plot_dataset(ax, x_data, y_data, labels_data, dataset_name):
+        # 根据手法分类拆分坐标
+        x_o = [x_data[i] for i, l in enumerate(labels_data) if l in o_methods]
+        y_o = [y_data[i] for i, l in enumerate(labels_data) if l in o_methods]
+        
+        x_tri = [x_data[i] for i, l in enumerate(labels_data) if l in triangle_methods]
+        y_tri = [y_data[i] for i, l in enumerate(labels_data) if l in triangle_methods]
+        
+        x_sq = [x_data[i] for i, l in enumerate(labels_data) if l in square_methods]
+        y_sq = [y_data[i] for i, l in enumerate(labels_data) if l in square_methods]
+        
+        # 绘制三种不同标记与颜色的散点
+        ax.scatter(x_o, y_o, color='#2ca02c', marker='o', s=130, label='Direct MLM')
+        ax.scatter(x_tri, y_tri, color='#1f77b4', marker='^', s=130, label='Random-k Critic')
+        ax.scatter(x_sq, y_sq, color='#d62728', marker='s', s=130, label='Top-k Critic')
+        
+        # 遍历并智能标注文字标签（防止重叠）
+        for i, txt in enumerate(labels_data):
+            xi, yi = x_data[i], y_data[i]
+            xytext = (6, 5)  # 默认向右上方偏移
+            
+            # 针对特定重叠区间进行特异性文字错开处理
+            if dataset_name == 'ROCStory':
+                if txt == 'Top-3 critic':
+                    xytext = (6, -14)  # 往下移，不与高处的 Random-2 冲突
+            elif dataset_name == 'SIND':
+                # SIND 中 Top 系列点与 Random 系列点靠得非常近，Top 系列统一向下错开
+                if txt in ['Top-3 critic', 'Top-5 critic', 'Top-7 critic']:
+                    xytext = (6, -14)  
+                    
+            ax.annotate(txt, (xi, yi), textcoords="offset points", xytext=xytext, fontsize=9.5)
+            
+        # 各子图基本配置
+        ax.set_title(dataset_name, fontsize=14, fontweight='bold', pad=10)
+        ax.set_xlabel('Relative FLOPs', fontsize=12)
+        ax.grid(True, linestyle='--', alpha=0.5)
+        
+        # 拓宽 X 轴范围，防止右侧长文本（如 Random-4 critic）超出图片边界
+        ax.set_xlim(0.3, 9.5)
+
+
+    # ==================== 4. 绘图与布局微调 ====================
+    # 分别画左边的 SIND 和右边的 ROCStory
+    plot_dataset(ax1, x_sind, y_sind, labels_sind, 'SIND')
+    plot_dataset(ax2, x_roc, y_roc, labels_roc, 'ROCStory')
+
+    # 为两个子图均添加 Y 轴标签
+    ax1.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
+    ax2.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
+
+    # 统一合并提取图例，水平平铺（ncol=3）展示在画布正上方
+    handles, labels = ax1.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.06), ncol=3, fontsize=11)
+
+    # 自动紧凑布局
+    plt.tight_layout()
+
+    # 保存为符合 LaTeX 导入规范的高清 PDF 矢量图
+    plt.savefig('methods_comparison_markers.pdf', bbox_inches='tight')
+    print("高清双子图已成功生成并保存为 'methods_comparison_markers.pdf' 文件！")
