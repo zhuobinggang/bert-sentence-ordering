@@ -383,7 +383,7 @@ def test_trained(sind=True, split='test'):
     # 根据前面设定的命名规则，动态组合搜索字符串
     # 例如：'critic_bert_sind' 或 'critic_bert_rocs'
     dataset_tag = 'sind' if sind else 'rocs'
-    search_string = f"critic_bert_{dataset_tag}"
+    search_string = f"listmle_rep"
     
     # 找出文件夹下所有匹配的 pth/ckpt 文件
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
