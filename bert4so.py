@@ -181,7 +181,6 @@ def train(sind=True, num_repeats=3, epochs_per_repeat=5):
                 save_checkpoint(model, prefix=prefix, suffix=current_suffix)
             else:
                 print(f"放回未保存。当前 Tau: {tau:.4f}，当前 Repeat 历史最佳 Tau: {best_tau:.4f}")
-
     print("\n✅ 所有 Repeat 训练任务已全部完成！")
 
 def default_critic_model_sind():
@@ -371,3 +370,85 @@ def test_order_consistency(model=None, sind=True):
     print(f"==============================================================")
     
     return inconsistency_rate
+
+
+def test_trained(sind=True, split='test'):
+    """
+    自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
+    并在指定的数据集划分（默认 test 集）上跑全量指标测试。
+    """
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    
+    # 根据前面设定的命名规则，动态组合搜索字符串
+    # 例如：'critic_bert_sind' 或 'critic_bert_rocs'
+    dataset_tag = 'sind' if sind else 'rocs'
+    search_string = f"critic_bert_{dataset_tag}"
+    
+    # 找出文件夹下所有匹配的 pth/ckpt 文件
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    
+    if not matching_files:
+        print(f"❌ 未在 {directory_path} 中找到包含 '{search_string}' 的模型权重文件。")
+        return
+
+    # 加载对应的测试/验证数据
+    test_paragraphs = sind_paragraphs(split) if sind else rocs.dataset_get()[split]
+    print(f"🔍 找到 {len(matching_files)} 个匹配的模型，开始在 {dataset_tag.upper()} 的 【{split}】 集上进行测试...")
+
+    for file in matching_files:
+        # 1. 必须实例化完整的神经网络架构（包含 BERT 和 Linear Head）
+        model = CriticBert()
+        load_checkpoint(model, str(file))
+        model.to(DEVICE)
+        model.eval()
+        
+        total_tau = 0.0
+        total_acc = 0.0
+        total_pmr = 0.0
+        total_count = 0
+        
+        # 2. 遍历测试集进行微观打分与排序还原
+        for tgt_paragraph in test_paragraphs:
+            if len(tgt_paragraph) <= 1:
+                continue
+                
+            # 测试时同样需要随机打乱，看模型能否完美复原
+            shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph)
+            
+            input_ids, attention_mask = build_bert_input(shuffled_paragraph)
+            input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
+            attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)
+            
+            with torch.no_grad():
+                scores = model(input_ids_t, attention_mask_t)
+                
+            # 将输出的分数转换为绝对位置排名
+            scores_cpu = scores.cpu()
+            predicted_labels = torch.argsort(torch.argsort(scores_cpu, descending=True)).tolist()
+            
+            # 3. 调用你的算分函数
+            tau = cal_tau(predicted_labels, true_labels)
+            acc = cal_acc(predicted_labels, true_labels)
+            pmr = cal_PMR(predicted_labels, true_labels)
+            
+            if np.isnan(tau):
+                tau = 0.0
+                
+            total_tau += tau
+            total_acc += acc
+            total_pmr += pmr
+            total_count += 1
+            
+        # 4. 计算当前模型的平均指标
+        mean_tau = total_tau / total_count if total_count > 0 else 0
+        mean_acc = total_acc / total_count if total_count > 0 else 0
+        mean_pmr = total_pmr / total_count if total_count > 0 else 0
+        
+        result_str = f"Tau: {mean_tau:.4f} | Acc: {mean_acc:.4f} | PMR: {mean_pmr:.4f}"
+        
+        # 5. 打印并记录日志
+        print(f'Model: {file.name} -> {result_str}')
+        common.logging.warning(f'Model: {file.name} -> {result_str}')
+        
+    print("\n✅ 所有模型测试完毕！")
