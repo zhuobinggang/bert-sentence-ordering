@@ -61,6 +61,7 @@ def cal_mean_std(scores):
     std_np = np.std(scores, ddof=1)
     mean_np = np.mean(scores)
     print(f"Numpy: {mean_np:.4f} ± {std_np:.4f}")
+    return f'{mean_np:.4f} ± {std_np:.4f}'
 
 def list_equal(list1, list2):
     if len(list1) != len(list2):

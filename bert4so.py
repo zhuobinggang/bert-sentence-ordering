@@ -463,5 +463,6 @@ def test_trained(sind=True, split='test'):
         print(f'tau: {common.cal_mean_std(taus)}')
         print(f'acc: {common.cal_mean_std(accs)}')
         print(f'pmr: {common.cal_mean_std(pmrs)}')
+        common.logging.warning(f'Mean & Std Across All Models -> tau: {common.cal_mean_std(taus)}, acc: {common.cal_mean_std(accs)}, pmr: {common.cal_mean_std(pmrs)}')
 
     print("\n✅ 所有模型测试完毕！")
