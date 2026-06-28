@@ -371,6 +371,39 @@ def test_order_consistency(model=None, sind=True):
     
     return inconsistency_rate
 
+def test_order_consistency_across_models(sind=True):
+    """
+    自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
+    并在指定的数据集上跑顺序一致性测试。
+    """
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    
+    dataset_tag = 'sind' if sind else 'rocs'
+    search_string = f"{dataset_tag}_listmle_rep"
+    
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    
+    if not matching_files:
+        print(f"❌ 未在 {directory_path} 中找到包含 '{search_string}' 的模型权重文件。")
+        return
+
+    print(f"🔍 找到 {len(matching_files)} 个匹配的模型，开始在 {dataset_tag.upper()} 上进行顺序一致性测试...")
+    
+    for file in matching_files:
+        model = CriticBert()
+        load_checkpoint(model, str(file))
+        model.to(DEVICE)
+        model.eval()
+        
+        inconsistency_rate = test_order_consistency(model=model, sind=sind)
+        consistency_rate = 1.0 - inconsistency_rate
+        
+        result_str = f"Inconsistency Rate: {inconsistency_rate:.4%} | Consistency Rate: {consistency_rate:.4%}"
+        
+        print(f'Model: {file.name} -> {result_str}')
+        common.logging.warning(f'Model: {file.name} -> {result_str}')
+
 
 def test_trained(sind=True, split='test'):
     """
