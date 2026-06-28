@@ -118,9 +118,11 @@ def valid_bert_n_pass_coherency(sind = True, split = 'val', npass = 2):
                 bert_input = create_bert_input_for_shuffled_paragraph(random_paragraph, random_labels)
                 temp_mask_token_5index_logits = get_mask_token_5index_logits(bert_input.input_ids, bert_input.attention_mask, bert)
                 temp_predicted_labels = hungarian_algorithm_best_order(temp_mask_token_5index_logits.cpu().numpy())
-                if not list_in(temp_predicted_labels, predicted_labels):
+                if len(predicted_labels) > 0 and not list_in(temp_predicted_labels, predicted_labels):
                     consistent = False
                     break
+                else:
+                    predicted_labels.append(temp_predicted_labels)
             results.append(1 if consistent else 0)
         print(f'Coherency: {sum(results)}/{len(results)} = {sum(results)/len(results)}')
     
