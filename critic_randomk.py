@@ -91,7 +91,8 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3,
             'all_true_labels': all_true_labels
         }
     
-
+# 计算模型在 coherency 上的表现，npass 次解码，如果每次解码的结果都一致，则认为是 coherent 的
+# 结果已汇报
 def valid_bert_n_pass_coherency(sind = True, split = 'val', npass = 2):
     if sind:
         paragraphs = sind_paragraphs(split)

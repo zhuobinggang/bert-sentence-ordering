@@ -1,6 +1,13 @@
 from rocs import *
 from sind import DEVICE
 
+def checkpoint_paths():
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    search_string = '_vanilla_rocs_'
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    return matching_files
+
 def train_n_repeats():
     n = common.args.repeats
     offset = common.args.offset
@@ -10,10 +17,7 @@ def train_n_repeats():
               val_dataloader_provider=val_dataloader_provider)
         
 def test_trained():
-    from pathlib import Path
-    directory_path = Path("./checkpoints")
-    search_string = '_vanilla_rocs_'
-    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    matching_files = checkpoint_paths()
     test_dataloader = test_dataloader_provider()
     for file in matching_files:
         bert = default_bert()

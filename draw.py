@@ -62,20 +62,20 @@ def sind():
 def double_draw():
     # ==================== 1. 数据准备 ====================
     # ROCStory 数据
-    labels_roc = ['BERT4SO', 'BERSON', 'Direct MLM', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    labels_roc = ['BERT4SO', 'BERSON', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
     x_roc = [1.0, 7.95, 1.0, 4.0, 6.0, 8.0]
     y_roc = [0.8457, 0.88, 0.8518, 0.8593, 0.8622, 0.8633]
 
     # SIND 数据
-    labels_sind = ['BERT4SO', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    labels_sind = ['BERT4SO', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
     x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 6.0, 8.0]
     y_sind = [0.5837, 0.65, 0.67, 0.5900, 0.5986, 0.6048, 0.6054]
 
     # 我们手法的大类
-    our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2', 'Random-3', 'Random-4']
 
     # 需要用蓝色线连接显示趋势的特定手法列表
-    line_methods = ['Direct MLM', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    line_methods = ['Direct MLM', 'Random-2', 'Random-3', 'Random-4']
 
 
     # ==================== 2. 创建画布 ====================
@@ -140,8 +140,8 @@ def double_draw():
     plot_dataset(ax2, x_roc, y_roc, labels_roc, 'ROCStory')     # 右边放 ROCStory
 
     # 为两个图均添加 Y 轴标签（如果你需要的话）
-    ax1.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
-    ax2.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
+    ax1.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
+    ax2.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
 
     # ==================== 5. 提取并合并图例 ====================
     handles, labels = ax1.get_legend_handles_labels()
@@ -151,30 +151,30 @@ def double_draw():
     plt.tight_layout()
 
     # 保存为 EPS 格式
-    plt.savefig('datasets_comparison.eps', bbox_inches='tight')
-    print("EPS 图表已成功生成并保存在当前目录下！")
+    plt.savefig('datasets_comparison.pdf', bbox_inches='tight')
+    print("PDF 图表已成功生成并保存在当前目录下！")
 
 
 def double_draw_critic_strategy():
     # ==================== 1. 数据准备 ====================
     # ROCStory 数据
-    labels_roc = ['Direct MLM', 'Top-3 critic', 'Top-5 critic', 'Top-7 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    labels_roc = ['Direct MLM', 'Top-3', 'Top-5', 'Top-7', 'Random-2', 'Random-3', 'Random-4']
     x_roc = [1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
     y_roc = [0.8518, 0.8541, 0.8519, 0.8496, 0.8593, 0.8622, 0.8633]
 
     # SIND 数据
-    labels_sind = ['Direct MLM', 'Top-3 critic', 'Top-5 critic', 'Top-7 critic', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    labels_sind = ['Direct MLM', 'Top-3', 'Top-5', 'Top-7', 'Random-2', 'Random-3', 'Random-4']
     x_sind = [1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
     y_sind = [0.5900, 0.5967, 0.5975, 0.5983, 0.5986, 0.6048, 0.6054]
 
     # 手法分类与对应的标记符号（Markers）
     o_methods = ['Direct MLM']
-    square_methods = ['Top-3 critic', 'Top-5 critic', 'Top-7 critic']
-    triangle_methods = ['Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    square_methods = ['Top-3', 'Top-5', 'Top-7']
+    triangle_methods = ['Random-2', 'Random-3', 'Random-4']
 
     # 定义两条趋势线各自包含的方法序列（都从 Direct MLM 开始算起）
-    top_k_line_series = ['Direct MLM', 'Top-3 critic', 'Top-5 critic', 'Top-7 critic']
-    rand_k_line_series = ['Direct MLM', 'Random-2 critic', 'Random-3 critic', 'Random-4 critic']
+    top_k_line_series = ['Direct MLM', 'Top-3', 'Top-5', 'Top-7']
+    rand_k_line_series = ['Direct MLM', 'Random-2', 'Random-3', 'Random-4']
 
 
     # ==================== 2. 创建画布 ====================
@@ -244,8 +244,8 @@ def double_draw_critic_strategy():
     plot_dataset(ax2, x_roc, y_roc, labels_roc, 'ROCStory')
 
     # 为两个子图均添加 Y 轴标签
-    ax1.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
-    ax2.set_ylabel('Kendall’s Tau ($\tau$)', fontsize=12)
+    ax1.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
+    ax2.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
 
     # 统一合并提取图例，水平平铺（ncol=3）展示在画布正上方
     handles, labels = ax1.get_legend_handles_labels()
@@ -255,5 +255,5 @@ def double_draw_critic_strategy():
     plt.tight_layout()
 
     # 保存为符合 LaTeX 导入规范的高清 PDF 矢量图
-    plt.savefig('methods_comparison_markers.pdf', bbox_inches='tight')
-    print("具有两条策略趋势虚线的高清双子图已成功生成：'methods_comparison_markers.pdf'")
+    plt.savefig('critic_strategies.pdf', bbox_inches='tight')
+    print("具有两条策略趋势虚线的高清双子图已成功生成：'critic_strategies.pdf'")
