@@ -45,13 +45,16 @@ def build_bert_input(paragraph_list):
     attention_mask = [1] * len(input_ids)
     return input_ids, attention_mask
 
-def create_shuffled_paragraph_with_labels(clean_paragraph):
+def create_shuffled_paragraph_with_labels(clean_paragraph, need_shuffle=True):
     """ 
     将完美顺序的段落随机彻底打乱，并返回打乱后的段落以及每个句子对应的【真实绝对位置标签】。
     例如：原段落为 [A, B, C] (正确顺序)
     打乱后可能为 [C, A, B]
     对应的 true_positions 就是 [2.0, 0.0, 1.0] (因为C原本是第2句，A是第0句，B是第1句)
     """
+    if not need_shuffle:
+        true_positions = [float(i) for i in range(len(clean_paragraph))]
+        return clean_paragraph, true_positions
     indexed_paragraph = list(enumerate(clean_paragraph))
     random.shuffle(indexed_paragraph) # 彻底打乱
     
@@ -405,7 +408,7 @@ def test_order_consistency_across_models(sind=True):
         common.logging.warning(f'Model: {file.name} -> {result_str}')
 
 
-def test_trained(sind=True, split='test'):
+def test_trained(sind=True, split='test', need_shuffle=True):
     """
     自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
     并在指定的数据集划分（默认 test 集）上跑全量指标测试。
@@ -450,8 +453,9 @@ def test_trained(sind=True, split='test'):
                 continue
                 
             # 测试时同样需要随机打乱，看模型能否完美复原
-            shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph)
-            
+            shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph, need_shuffle=need_shuffle)
+            common.print_only_once(f"labels: {true_labels}")
+
             input_ids, attention_mask = build_bert_input(shuffled_paragraph)
             input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
             attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)

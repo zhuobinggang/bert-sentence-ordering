@@ -62,12 +62,12 @@ def sind():
 def double_draw():
     # ==================== 1. 数据准备 ====================
     # ROCStory 数据
-    labels_roc = ['BERT4SO', 'BERSON', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
+    labels_roc = ['BERT4SO♢', 'BERSON', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
     x_roc = [1.0, 7.95, 1.0, 4.0, 6.0, 8.0]
     y_roc = [0.8457, 0.88, 0.8518, 0.8593, 0.8622, 0.8633]
 
     # SIND 数据
-    labels_sind = ['BERT4SO', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
+    labels_sind = ['BERT4SO♢', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
     x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 6.0, 8.0]
     y_sind = [0.5837, 0.65, 0.67, 0.5900, 0.5986, 0.6048, 0.6054]
 

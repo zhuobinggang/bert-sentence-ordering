@@ -83,3 +83,8 @@ def search_files_in_directory(search_string, directory="./checkpoints"):
     directory_path = Path(directory)
     matching_file_abs_paths = [str(file) for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     return matching_file_abs_paths
+
+def print_only_once(msg):
+    if not hasattr(print_only_once, "has_printed"):
+        print(msg)
+        print_only_once.has_printed = True
