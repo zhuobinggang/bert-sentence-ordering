@@ -1,7 +1,8 @@
 from two_pass_plus import *
 from critic_bert_simple import *
-from critic_bert import resort_paragraph, recover_unsorted_paragraph
 from common import list_equal, list_in
+from common import resort_paragraph
+from common import recover_unsorted_paragraph
 
 def default_trained_bert(path = './checkpoints/SIND_best_e1.pth'):
     bert = default_bert()

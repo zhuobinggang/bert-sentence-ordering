@@ -2,10 +2,11 @@
 from critic_bert_simple import get_critic_score, default_critic_model_sind, default_critic_model_rocs
 import itertools
 import math
-from critic_bert import resort_paragraph, recover_unsorted_paragraph
+from common import recover_unsorted_paragraph
 from sind import sind_paragraphs
 from two_pass_plus import *
 import common
+from common import resort_paragraph
 
 def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
     """

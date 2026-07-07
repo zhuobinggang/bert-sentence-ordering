@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from recordclass import recordclass
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from common import add_one
 
 TestResult = recordclass('TestResult', 'tau acc pmr')
 
@@ -91,8 +92,7 @@ def paragraph_prefix_suffix_with_instruct():
     paragraph_suffix_ids = toker.encode(paragraph_suffix, add_special_tokens=False)
     return paragraph_prefx_ids, paragraph_suffix_ids
 
-def add_one(lst):
-    return [x + 1 for x in lst]
+
 
 def shuffle_paragraph(paragraph, need_add_one = True, need_shuffle = True):
     indexs = list(range(len(paragraph)))
