@@ -1,32 +1,9 @@
 import itertools
-from common import resort_paragraph, recover_unsorted_paragraph, add_one
+from common import resort_paragraph, add_one
 from bert4so import *
+logger = common.logging.getLogger(__name__)
 
-
-def generate_permutations(n):
-    return list(itertools.permutations(range(n)))
-
-
-# 使用排序模型来给5!种排序可能性进行评分，选择得分最高的排序作为最终结果
-def run():
-    # 1. 生成5!种排序可能性
-    permutations = generate_permutations(5)  # 假设有一个函数可以生成5!种排列
-
-    # 2. 对每种排序进行评分
-    scores = []
-    for perm in permutations:
-        score = score_permutation(perm)  # 假设有一个函数可以对排列进行评分
-        scores.append((perm, score))
-
-    # 3. 找到得分最高的排序
-    best_permutation = max(scores, key=lambda x: x[1])[0]
-
-    return best_permutation
-
-
-
-def test_trained(sind=True, split='test', need_shuffle=True):
-    logger = common.logging.getLogger(__name__)
+def test_trained_all_perm(sind=True, split='test'):
     """
     自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
     并在指定的数据集划分（默认 test 集）上跑全量指标测试。
@@ -117,3 +94,14 @@ def test_trained(sind=True, split='test', need_shuffle=True):
     logger.warning(f'Mean & Std Across All Models -> tau: {common.cal_mean_std(taus)}, acc: {common.cal_mean_std(accs)}, pmr: {common.cal_mean_std(pmrs)}')
 
     print("\n✅ 所有模型测试完毕！")
+
+
+if __name__ == "__main__":
+    # 你可以在这里调用 test_trained_all_perm 函数进行测试
+    logger.warning("Starting test_trained_all_perm...SIND=True, split='test'")
+    test_trained_all_perm(sind=True, split='test')
+    logger.warning("Starting test_trained_all_perm...SIND=False, split='test'")
+    test_trained_all_perm(sind=False, split='test')
+   
+    
+
