@@ -51,7 +51,8 @@ def train_dataloader_provider():
     dataloader = bert_inputs_to_dataloader_shuffle(bert_inputs)
     return dataloader
 
-def train(epochs = 5, suffix = '_nips'):
+# NOTE: NIPS默认训练10个epoch，其他数据集默认训练5个epoch
+def train(epochs = 10, suffix = '_nips'):
     # 记录日志
     logger = common.logging.getLogger(__name__)
     writer = common.get_writer()
@@ -91,5 +92,10 @@ def train(epochs = 5, suffix = '_nips'):
         if score.tau > MAX_TAU:
             print(f'保存模型，当前tau提升到{score.tau}，之前的最高tau是{MAX_TAU}')
             MAX_TAU = score.tau
-            save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_tau')
-    return model
+            save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_tau', prefix="NIPS_best")
+
+
+def n_repeat_train(epochs = 8, n_repeat = 3):
+    for i in range(n_repeat):
+        print(f'第{i+1}次训练...')
+        train(epochs = epochs, suffix = f'nips_repeat_{i+1}')
