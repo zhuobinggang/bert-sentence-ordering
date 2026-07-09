@@ -26,7 +26,9 @@ def default_bert():
         model = BertForMaskedLM.from_pretrained(BERT_BASE_UNCASED_MODEL_ID)
     else:
         model = RobertaForMaskedLM.from_pretrained(ROBERTA_BASE_UNCASED_MODEL_ID)
-    return model.to(DEVICE)
+    _ = model.eval()  # 设置为评估模式
+    _ = model.to(DEVICE)  # 将模型移动到指定设备
+    return model
 
 def test_default_bert():
     toker = default_tokenizer()

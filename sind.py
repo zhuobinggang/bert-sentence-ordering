@@ -110,16 +110,26 @@ def default_prefix_suffix_provider():
     paragraph_prefx_ids, paragraph_suffix_ids = default_paragraph_prefix_and_suffix()
     return sentence_prefix_ids, paragraph_prefx_ids, paragraph_suffix_ids
 
+# 返回每个句子的前缀
+# mask的情况： ([MASK])
+# 非mask的情况： (sentence_label_token)，这里sentence_label_token是从1开始的标签，代表原来的第几句话 
 def sentence_prefix_random_mask(indexs, random_mask_count = 5, output_mask_indices = False):
-    random_mask_count = min(random_mask_count, len(indexs))
-    random_mask_indices = random.sample(range(len(indexs)), random_mask_count) # 随机选择n个句子进行MASK
-    random_mask_indices = sorted(random_mask_indices) # 将随机选择的索引排序，保证顺序不变
     sentence_prefix_ids_by_sentence = []
-    for i, sentence_index in enumerate(indexs):
-        if i in random_mask_indices:
-            sentence_prefix_ids_by_sentence.append(default_sentence_prefix()) # 使用MASK token作为前缀
-        else:
-            sentence_prefix_ids_by_sentence.append(default_sentence_prefix(sentence_index))
+    random_mask_indices = []
+    random_mask_count = min(random_mask_count, len(indexs))
+    if random_mask_count == len(indexs):
+        # 如果随机mask的数量等于句子总数，则直接返回全部([MASK])
+        sentence_prefix_ids_by_sentence = [default_sentence_prefix() for _ in indexs]
+        random_mask_indices = list(range(len(indexs)))
+    else:
+        random_mask_indices = random.sample(range(len(indexs)), random_mask_count) # 随机选择n个句子进行MASK
+        random_mask_indices = sorted(random_mask_indices) # 将随机选择的索引排序，保证顺序不变
+        sentence_prefix_ids_by_sentence = []
+        for i, sentence_index in enumerate(indexs):
+            if i in random_mask_indices:
+                sentence_prefix_ids_by_sentence.append(default_sentence_prefix()) # 使用MASK token作为前缀
+            else:
+                sentence_prefix_ids_by_sentence.append(default_sentence_prefix(sentence_index))
     if output_mask_indices:
         return sentence_prefix_ids_by_sentence, random_mask_indices
     else:
@@ -152,6 +162,7 @@ def create_bert_input_for_shuffled_paragraph(paragraph, indexs, MAX_SENTENCE_IDS
     # 将每个故事的5个句子拼接成一个段落，加入CLS和SEP
     # 句子前缀
     common.print_once(f"随机MASK{random_mask_count}个句子前缀!")
+    # NOTE: 这里主要是考虑到存在[MASK]一部分而非全部的情况，
     sentence_prefix_ids_by_sentence, random_mask_indices = sentence_prefix_random_mask(indexs, random_mask_count=random_mask_count, output_mask_indices=True) # 随机选取若干句子进行MASK，默认是全部句子都进行MASK
     sentence_idss_with_prefix = []
     for prefix_ids, sentence_ids in zip(sentence_prefix_ids_by_sentence, sentence_idss):
@@ -366,7 +377,7 @@ def valid_bert_batched_keep_repeated(bert = None, split = 'val', split_length = 
 
 
 # 匈牙利算法 2026.6.15
-def hungarian_algorithm_best_order(model_outputs):
+def hungarian_algorithm_best_order(model_outputs, need_add_one = True):
     """
     model_outputs: 模型的原始输出。
     假设形状为 (5, 5)，即 5个句子，每个句子对应 5个位置的 logit 或 softmax 概率值。
@@ -386,8 +397,11 @@ def hungarian_algorithm_best_order(model_outputs):
     
     # 4. col_ind 就是最终生成的无重复完美排列（0~4 映射）
     # 如果你的评估代码需要 1~5 的标签，直接 + 1 即可
-    final_positions = col_ind + 1
-    
+    if need_add_one:
+        final_positions = col_ind + 1
+    else:
+        final_positions = col_ind
+
     return final_positions
 
 
