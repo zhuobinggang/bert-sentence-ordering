@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from torch import nn
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+logger = common.logging.getLogger(__name__)
 
 def nips_bert_input_for_critic(paragraph):
     bert_input = nips_bert_input.nips_bert_input(paragraph, need_shuffle = False) # NOTE: 这里不能shuffle否则BUG
@@ -112,6 +113,8 @@ def train(epoch = 1):
         optimizer.zero_grad()
         acc = valid_trained_nips(model)
         if acc > best_acc:
-            print(f"New best accuracy: {acc:.4f}, save model checkpoint")
+            msg = f"New best accuracy: {acc:.4f}, save model checkpoint"
+            print(msg)
+            logger.warning(msg)
             best_acc = acc
             critic_bert_simple.save_checkpoint(model, prefix=prefix, suffix='')
