@@ -92,7 +92,7 @@ def print_only_once(msg):
 
 def resort_paragraph(paragraph, predicted_label):
     """ 根据predicted_label重排paragraph，得到新的段落顺序 """
-    ordered_paragraph = [None] * 5
+    ordered_paragraph = [None] * len(paragraph)
     for idx, label in enumerate(predicted_label):
         ordered_paragraph[label - 1] = paragraph[idx] # label是1-5的索引
     return ordered_paragraph
@@ -101,7 +101,7 @@ def resort_paragraph(paragraph, predicted_label):
 # 将排好的段落s1, s2, s3, s4, s5按predicted_label重建未排序的段落
 def recover_unsorted_paragraph(paragraph, predicted_label):
     """ 根据predicted_label重排paragraph，得到新的段落顺序 """
-    unsorted_paragraph = [None] * 5
+    unsorted_paragraph = [None] * len(paragraph)
     for idx, label in enumerate(predicted_label):
         unsorted_paragraph[idx] = paragraph[label - 1] # label是1-5的索引
     return unsorted_paragraph

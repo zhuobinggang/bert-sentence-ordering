@@ -10,6 +10,8 @@ import torch
 from torch import nn
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 logger = common.logging.getLogger(__name__)
+from critic_bert_simple import CriticBert
+from sind import load_checkpoint
 
 def nips_bert_input_for_critic(paragraph):
     bert_input = nips_bert_input.nips_bert_input(paragraph, need_shuffle = False) # NOTE: 这里不能shuffle否则BUG
@@ -118,3 +120,10 @@ def train(epoch = 1):
             logger.warning(msg)
             best_acc = acc
             critic_bert_simple.save_checkpoint(model, prefix=prefix, suffix='')
+
+def default_critic_model_nips():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_nips_default.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
