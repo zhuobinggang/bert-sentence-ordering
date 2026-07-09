@@ -519,6 +519,9 @@ def load_checkpoint(bert, path):
     bert.load_state_dict(checkpoint['state'])
     bert.valid_score = checkpoint.get('valid_score', -1)
     bert.stop_epoch = checkpoint.get('epoch', -1)
+    # 默认将模型移动到DEVICE上并设置为eval模式
+    bert.to(DEVICE)
+    bert.eval()
 
 def default_trian_dataloader_provider():
     print('重新制备训练数据集...')

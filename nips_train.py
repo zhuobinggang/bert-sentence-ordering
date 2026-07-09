@@ -95,7 +95,24 @@ def train(epochs = 10, suffix = '_nips'):
             save_checkpoint(model, base_path='checkpoints', epoch=epoch, valid_score=str(score), suffix=f'{model_suffix}_best_tau', prefix="NIPS_best")
 
 
-def n_repeat_train(epochs = 8, n_repeat = 3):
+def n_repeat_train(epochs = 10, n_repeat = 3):
     for i in range(n_repeat):
         print(f'第{i+1}次训练...')
         train(epochs = epochs, suffix = f'nips_repeat_{i+1}')
+
+
+def checkpoint_paths():
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    search_string = 'nips_repeat_'
+    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    return matching_files
+
+def test_trained():
+    ckpts = checkpoint_paths()
+    for file in ckpts:
+        bert = default_bert()
+        load_checkpoint(bert, str(file)) # 已默认将模型移动到DEVICE上并设置为eval模式
+        result = valid_bert_nips(bert, 'test')
+        print(f'Model nips repeat: {file}, Test Result: {result}')
+        common.logging.warning(f'Model nips repeat: {file}, Test Result: {result}')
