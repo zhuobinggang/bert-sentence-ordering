@@ -10,8 +10,8 @@ import torch
 from torch import nn
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def nips_bert_input_for_critic(paragraph, need_shuffle = True):
-    bert_input = nips_bert_input.nips_bert_input(paragraph, need_shuffle)
+def nips_bert_input_for_critic(paragraph):
+    bert_input = nips_bert_input.nips_bert_input(paragraph, need_shuffle = False) # NOTE: 这里不能shuffle否则BUG
     return bert_input.input_ids, bert_input.attention_mask
 
 
@@ -50,6 +50,7 @@ def valid_trained_nips(model = None):
     print(f"Critic 判别准确率 (Pairwise Accuracy on Val): {acc:.4f}")
     return acc
 
+# NOTE: 因为nips数据集很小所以可能需要多个epoch
 def train(epoch = 1):
     model = critic_bert_simple.CriticBert()
     model.to(DEVICE)
