@@ -17,6 +17,7 @@ def nips_bert_input(paragraph, need_shuffle = True):
         MAX_SENTENCE_IDS = max_sentence_token_length)
     return bert_input
 
+
 def nips_data_prepare(paragraphs, need_shuffle = True):
     results = []
     for paragraph in paragraphs:

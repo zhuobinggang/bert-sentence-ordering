@@ -110,9 +110,17 @@ def checkpoint_paths():
 
 def test_trained():
     ckpts = checkpoint_paths()
+    results = []
     for file in ckpts:
         bert = default_bert()
         load_checkpoint(bert, str(file)) # 已默认将模型移动到DEVICE上并设置为eval模式
         result = valid_bert_nips(bert, 'test')
+        results.append(result)
         print(f'Model nips repeat: {file}, Test Result: {result}')
         common.logging.warning(f'Model nips repeat: {file}, Test Result: {result}')
+    print('Tau:')
+    common.cal_mean_std([r.tau for r in results])
+    print('Acc:')
+    common.cal_mean_std([r.acc for r in results])
+    print('PMR:')
+    common.cal_mean_std([r.pmr for r in results])
