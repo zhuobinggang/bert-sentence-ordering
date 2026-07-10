@@ -427,22 +427,22 @@ def test_trained(matching_files, test_paragraphs, need_shuffle=True):
         accs.append(test_result.acc)
         pmrs.append(test_result.pmr)
         
-        tau_str = common.cal_mean_std(taus)
-        acc_str = common.cal_mean_std(accs)
-        pmr_str = common.cal_mean_std(pmrs)
-        
-        result_str = f"Tau: {tau_str} | Acc: {acc_str} | PMR: {pmr_str}"
-        
-        # 5. 打印并记录日志
-        print(f'Model: {file.name} -> {result_str}')
-        common.logging.warning(f'Model: {file.name} -> {result_str}')
+    tau_str = common.cal_mean_std(taus)
+    acc_str = common.cal_mean_std(accs)
+    pmr_str = common.cal_mean_std(pmrs)
+    
+    result_str = f"Tau: {tau_str} | Acc: {acc_str} | PMR: {pmr_str}"
+    
+    # 5. 打印并记录日志
+    print(f'Model: {file} -> {result_str}')
+    common.logging.warning(f'Model: {file} -> {result_str}')
 
-        # 6. 打印mean std
-        print('=================== Mean & Std Across All Models ===================')
-        print(f'tau: {tau_str}')
-        print(f'acc: {acc_str}')
-        print(f'pmr: {pmr_str}')
-        common.logging.warning(f'Mean & Std Across All Models -> tau: {tau_str}, acc: {acc_str}, pmr: {pmr_str}')
+    # 6. 打印mean std
+    print('=================== Mean & Std Across All Models ===================')
+    print(f'tau: {tau_str}')
+    print(f'acc: {acc_str}')
+    print(f'pmr: {pmr_str}')
+    common.logging.warning(f'Mean & Std Across All Models -> tau: {tau_str}, acc: {acc_str}, pmr: {pmr_str}')
 
     print("\n✅ 所有模型测试完毕！")
 
