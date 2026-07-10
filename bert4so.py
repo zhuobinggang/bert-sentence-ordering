@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 import numpy as np
-from sind import save_checkpoint, load_checkpoint, cal_tau, cal_acc, cal_PMR
+from sind import save_checkpoint, load_checkpoint, cal_tau, cal_acc, cal_PMR, TestResult
 # 假设你的基础函数库
 from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_paragraphs
 
@@ -32,13 +32,28 @@ class CriticBert(nn.Module):
         logits = self.head(cls_hidden) # [num_sentences, 1]
         return logits.squeeze(-1) # [num_sentences]
 
-def build_bert_input(paragraph_list):
+def build_bert_input_constant_token_length(paragraph_list):
     """ 将所有句子拼接，并且在【每个句子】前面都添加一个 [CLS] token """
     input_ids = []
     cls_token_id = default_tokenizer().cls_token_id
     for sent in paragraph_list:
         input_ids.append(cls_token_id) 
         tokenized = default_tokenizer()(sent, truncation=True, max_length=MAX_SENTENCE_TOKENS, add_special_tokens=False)['input_ids']
+        input_ids.extend(tokenized)
+    input_ids.append(default_tokenizer().sep_token_id) 
+    
+    attention_mask = [1] * len(input_ids)
+    return input_ids, attention_mask
+
+
+def build_bert_input(paragraph_list):
+    """ 将所有句子拼接，并且在【每个句子】前面都添加一个 [CLS] token """
+    input_ids = []
+    cls_token_id = default_tokenizer().cls_token_id
+    max_token_length = 500 // len(paragraph_list) - 1  # NOTE: 考虑到nips数据集的平均句子长度，动态计算每个句子的最大token长度
+    for sent in paragraph_list:
+        input_ids.append(cls_token_id) 
+        tokenized = default_tokenizer()(sent, truncation=True, max_length=max_token_length, add_special_tokens=False)['input_ids']
         input_ids.extend(tokenized)
     input_ids.append(default_tokenizer().sep_token_id) 
     
@@ -102,14 +117,12 @@ def get_critic_score(critic_model, paragraph):
         score = -loss.item() # 负损失作为 Coherence Score
     return score
 
-def train(sind=True, num_repeats=3, epochs_per_repeat=5):
+def train(correct_paragraphs, num_repeats=3, epochs_per_repeat=5, prefix='bert4so', val_paragraphs = []):
     """
     支持多轮独立重复训练（Repeat）的 ListMLE 训练函数。
     每个 Repeat 训练 epochs_per_repeat 次，并根据验证集 Tau 指标保存各自的最佳模型。
     """
     writer = common.get_writer()
-    correct_paragraphs = sind_paragraphs('train') if sind else rocs.dataset_get()['train']
-    prefix = 'critic_bert' + ('_sind' if sind else '_rocs')
     batch_size = 8 
     
     # ==================== 外层循环：控制训练的 Repeat 次数 ====================
@@ -172,7 +185,7 @@ def train(sind=True, num_repeats=3, epochs_per_repeat=5):
             # ==================== 内层：每个 Epoch 结束后的验证与保存 ====================
             print(f"\n[Rep {repeat_idx + 1} | Epoch {epoch_idx + 1}] 正在进行验证集全指标评估...")
             # 调用你写好的新评估函数，解包获取 tau
-            tau, acc, pmr = valid_trained_sentence_ordering(model, sind=sind)
+            tau, acc, pmr = test_trained_one_model(model, val_paragraphs, need_shuffle=True)
             
             # 根据当前 repeat 的内部 best_tau 决定是否更新
             if tau > best_tau:
@@ -185,6 +198,22 @@ def train(sind=True, num_repeats=3, epochs_per_repeat=5):
             else:
                 print(f"放回未保存。当前 Tau: {tau:.4f}，当前 Repeat 历史最佳 Tau: {best_tau:.4f}")
     print("\n✅ 所有 Repeat 训练任务已全部完成！")
+
+def train_sind():
+    train_paragraphs = sind_paragraphs('train')
+    val_paragraphs = sind_paragraphs('val')
+    train(train_paragraphs, val_paragraphs=val_paragraphs, num_repeats=3, epochs_per_repeat=5, prefix='bert4so_sind')
+
+def train_rocs():
+    train_paragraphs = rocs.dataset_get()['train']
+    val_paragraphs = rocs.dataset_get()['val']
+    train(train_paragraphs, val_paragraphs=val_paragraphs, num_repeats=3, epochs_per_repeat=5, prefix='bert4so_rocs')
+
+def train_nips():
+    from nips_data import get_paragraphs
+    train_paragraphs = get_paragraphs('train')
+    val_paragraphs = get_paragraphs('val')
+    train(train_paragraphs, val_paragraphs=val_paragraphs, num_repeats=3, epochs_per_repeat=5, prefix='bert4so_nips')
 
 def default_critic_model_sind():
     model = CriticBert()
@@ -227,78 +256,6 @@ def valid_trained(model = None):
     print(f"Critic 判别准确率 (Pairwise Accuracy on Val): {acc:.4f}")
     return acc
 
-
-
-def valid_trained_sentence_ordering(model=None, sind=True):
-    """
-    使用训练好的 ListMLE 模型在验证集/测试集上运行，
-    并计算并输出标准的 Tau, Accuracy 和 PMR 指标。
-    """
-    if model is None:
-        model = default_critic_model_sind() if sind else default_critic_model_rocs()
-    
-    model.to(DEVICE)
-    model.eval()
-    
-    # 1. 读取对应的验证集数据
-    val_paragraphs = sind_paragraphs('val') if sind else rocs.dataset_get()['val']
-    
-    total_tau = 0.0
-    total_acc = 0.0
-    total_pmr = 0.0
-    total_count = 0
-    
-    for tgt_paragraph in tqdm(val_paragraphs, desc="Evaluating Sentence Ordering"):
-        # 过滤掉少于2个句子的极度特殊段落（无法计算相关性）
-        if len(tgt_paragraph) <= 1:
-            continue
-            
-        # 2. 模拟测试环境：彻底打乱段落，并获取其真实的绝对位置标签
-        # true_labels 形式如: [2.0, 0.0, 1.0]
-        shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph)
-        
-        # 3. 构造 BERT 输入并让模型预测分数
-        input_ids, attention_mask = build_bert_input(shuffled_paragraph)
-        input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
-        attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)
-        
-        with torch.no_grad():
-            scores = model(input_ids_t, attention_mask_t) # 输出大小为 [num_sentences]
-            
-        # 4. 【核心步骤】将分数转化为预测的位置标签 (predicted_labels)
-        # 因为 ListMLE 训练出高分在前（即位置0），低分在后
-        # 我们用两次 argsort(descending=True) 即可直接把连续的分数转化为 0, 1, 2... 的排名
-        scores_cpu = scores.cpu()
-        predicted_labels = torch.argsort(torch.argsort(scores_cpu, descending=True)).tolist()
-        
-        # 5. 调用你提供的方法计算三大指标
-        tau = cal_tau(predicted_labels, true_labels)
-        acc = cal_acc(predicted_labels, true_labels)
-        pmr = cal_PMR(predicted_labels, true_labels)
-        
-        # 防止因极端情况 kendalltau 返回 nan
-        if np.isnan(tau):
-            tau = 0.0
-            
-        total_tau += tau
-        total_acc += acc
-        total_pmr += pmr
-        total_count += 1
-        
-    # 6. 计算全数据集的平均分
-    mean_tau = total_tau / total_count if total_count > 0 else 0
-    mean_acc = total_acc / total_count if total_count > 0 else 0
-    mean_pmr = total_pmr / total_count if total_count > 0 else 0
-    
-    # 7. 打印漂亮的测试报告
-    print(f"\n=================== Sentence Ordering Test Report ===================")
-    print(f"Dataset 类型: {'SIND' if sind else 'ROCS'} | 总评估段落数: {total_count}")
-    print(f"1. Kendall's Tau (τ)           : {mean_tau:.4f}  (越接近 1 越好)")
-    print(f"2. Absolute Position Acc (Acc) : {mean_acc:.4f}  (位置完全正确的句子占比)")
-    print(f"3. Perfect Match Rate (PMR)    : {mean_pmr:.4f}  (整篇文章完全排序正确的概率)")
-    print(f"=====================================================================")
-    
-    return mean_tau, mean_acc, mean_pmr
 
 
 
@@ -407,31 +364,54 @@ def test_order_consistency_across_models(sind=True):
         print(f'Model: {file.name} -> {result_str}')
         common.logging.warning(f'Model: {file.name} -> {result_str}')
 
-
-def test_trained(sind=True, split='test', need_shuffle=True):
-    """
-    自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
-    并在指定的数据集划分（默认 test 集）上跑全量指标测试。
-    """
-    from pathlib import Path
-    directory_path = Path("./checkpoints")
+def test_trained_one_model(model, test_paragraphs, need_shuffle=True):
     
-    # 根据前面设定的命名规则，动态组合搜索字符串
-    # 例如：'critic_bert_sind' 或 'critic_bert_rocs'
-    dataset_tag = 'sind' if sind else 'rocs'
-    search_string = f"{dataset_tag}_listmle_rep"
+    total_tau = 0.0
+    total_acc = 0.0
+    total_pmr = 0.0
+    total_count = 0
     
-    # 找出文件夹下所有匹配的 pth/ckpt 文件
-    matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
+    # 2. 遍历测试集进行微观打分与排序还原
+    for tgt_paragraph in test_paragraphs:
+        if len(tgt_paragraph) <= 1:
+            continue
+            
+        # 测试时同样需要随机打乱，看模型能否完美复原
+        shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph, need_shuffle=need_shuffle)
+        common.print_only_once(f"labels: {true_labels}")
+
+        input_ids, attention_mask = build_bert_input(shuffled_paragraph)
+        input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
+        attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)
+        
+        with torch.no_grad():
+            scores = model(input_ids_t, attention_mask_t)
+            
+        # 将输出的分数转换为绝对位置排名
+        scores_cpu = scores.cpu()
+        predicted_labels = torch.argsort(torch.argsort(scores_cpu, descending=True)).tolist()
+        
+        # 3. 调用你的算分函数
+        tau = cal_tau(predicted_labels, true_labels)
+        acc = cal_acc(predicted_labels, true_labels)
+        pmr = cal_PMR(predicted_labels, true_labels)
+        
+        if np.isnan(tau):
+            tau = 0.0
+            
+        total_tau += tau
+        total_acc += acc
+        total_pmr += pmr
+        total_count += 1
+        
+    # 4. 计算当前模型的平均指标
+    mean_tau = total_tau / total_count if total_count > 0 else 0
+    mean_acc = total_acc / total_count if total_count > 0 else 0
+    mean_pmr = total_pmr / total_count if total_count > 0 else 0
     
-    if not matching_files:
-        print(f"❌ 未在 {directory_path} 中找到包含 '{search_string}' 的模型权重文件。")
-        return
+    return TestResult(mean_tau, mean_acc, mean_pmr)
 
-    # 加载对应的测试/验证数据
-    test_paragraphs = sind_paragraphs(split) if sind else rocs.dataset_get()[split]
-    print(f"🔍 找到 {len(matching_files)} 个匹配的模型，开始在 {dataset_tag.upper()} 的 【{split}】 集上进行测试...")
-
+def test_trained(matching_files, test_paragraphs, need_shuffle=True):
     taus = []
     accs = []
     pmrs = []
@@ -442,54 +422,16 @@ def test_trained(sind=True, split='test', need_shuffle=True):
         model.to(DEVICE)
         model.eval()
         
-        total_tau = 0.0
-        total_acc = 0.0
-        total_pmr = 0.0
-        total_count = 0
+        test_result = test_trained_one_model(model, test_paragraphs, need_shuffle=need_shuffle)
+        taus.append(test_result.tau)
+        accs.append(test_result.acc)
+        pmrs.append(test_result.pmr)
         
-        # 2. 遍历测试集进行微观打分与排序还原
-        for tgt_paragraph in test_paragraphs:
-            if len(tgt_paragraph) <= 1:
-                continue
-                
-            # 测试时同样需要随机打乱，看模型能否完美复原
-            shuffled_paragraph, true_labels = create_shuffled_paragraph_with_labels(tgt_paragraph, need_shuffle=need_shuffle)
-            common.print_only_once(f"labels: {true_labels}")
-
-            input_ids, attention_mask = build_bert_input(shuffled_paragraph)
-            input_ids_t = torch.tensor(input_ids).unsqueeze(0).to(DEVICE)
-            attention_mask_t = torch.tensor(attention_mask).unsqueeze(0).to(DEVICE)
-            
-            with torch.no_grad():
-                scores = model(input_ids_t, attention_mask_t)
-                
-            # 将输出的分数转换为绝对位置排名
-            scores_cpu = scores.cpu()
-            predicted_labels = torch.argsort(torch.argsort(scores_cpu, descending=True)).tolist()
-            
-            # 3. 调用你的算分函数
-            tau = cal_tau(predicted_labels, true_labels)
-            acc = cal_acc(predicted_labels, true_labels)
-            pmr = cal_PMR(predicted_labels, true_labels)
-            
-            if np.isnan(tau):
-                tau = 0.0
-                
-            total_tau += tau
-            total_acc += acc
-            total_pmr += pmr
-            total_count += 1
-            
-        # 4. 计算当前模型的平均指标
-        mean_tau = total_tau / total_count if total_count > 0 else 0
-        mean_acc = total_acc / total_count if total_count > 0 else 0
-        mean_pmr = total_pmr / total_count if total_count > 0 else 0
+        tau_str = common.cal_mean_std(taus)
+        acc_str = common.cal_mean_std(accs)
+        pmr_str = common.cal_mean_std(pmrs)
         
-        taus.append(mean_tau)
-        accs.append(mean_acc)
-        pmrs.append(mean_pmr)
-
-        result_str = f"Tau: {mean_tau:.4f} | Acc: {mean_acc:.4f} | PMR: {mean_pmr:.4f}"
+        result_str = f"Tau: {tau_str} | Acc: {acc_str} | PMR: {pmr_str}"
         
         # 5. 打印并记录日志
         print(f'Model: {file.name} -> {result_str}')
@@ -497,9 +439,41 @@ def test_trained(sind=True, split='test', need_shuffle=True):
 
         # 6. 打印mean std
         print('=================== Mean & Std Across All Models ===================')
-        print(f'tau: {common.cal_mean_std(taus)}')
-        print(f'acc: {common.cal_mean_std(accs)}')
-        print(f'pmr: {common.cal_mean_std(pmrs)}')
-        common.logging.warning(f'Mean & Std Across All Models -> tau: {common.cal_mean_std(taus)}, acc: {common.cal_mean_std(accs)}, pmr: {common.cal_mean_std(pmrs)}')
+        print(f'tau: {tau_str}')
+        print(f'acc: {acc_str}')
+        print(f'pmr: {pmr_str}')
+        common.logging.warning(f'Mean & Std Across All Models -> tau: {tau_str}, acc: {acc_str}, pmr: {pmr_str}')
 
     print("\n✅ 所有模型测试完毕！")
+
+
+def test_trained_sind():
+    search_string = f"sind_listmle_rep"
+    # 找出文件夹下所有匹配的 pth/ckpt 文件
+    matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
+    if not matching_files:
+        print(f"❌ 未找到包含 '{search_string}' 的模型权重文件。")
+        return
+    test_paragraphs = sind_paragraphs('test')
+    test_trained(matching_files, test_paragraphs)
+
+def test_trained_rocs():
+    search_string = f"rocs_listmle_rep"
+    # 找出文件夹下所有匹配的 pth/ckpt 文件
+    matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
+    if not matching_files:
+        print(f"❌ 未找到包含 '{search_string}' 的模型权重文件。")
+        return
+    test_paragraphs = rocs.dataset_get()['test']
+    test_trained(matching_files, test_paragraphs)
+
+def test_trained_nips():
+    from nips_data import get_paragraphs
+    search_string = f"bert4so_nips"
+    # 找出文件夹下所有匹配的 pth/ckpt 文件
+    matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
+    if not matching_files:
+        print(f"❌ 未找到包含 '{search_string}' 的模型权重文件。")
+        return
+    test_paragraphs = get_paragraphs('test')
+    test_trained(matching_files, test_paragraphs)
