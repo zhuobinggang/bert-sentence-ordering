@@ -131,6 +131,13 @@ def default_critic_model_rocs():
     model.eval()
     return model
 
+def default_critic_model_nips():
+    model = CriticBert()
+    load_checkpoint(model, 'checkpoints/critic_nips_default.pth')
+    model.to(DEVICE)
+    model.eval()
+    return model
+
 def valid_trained(model = None):
     if model is None:
         model = default_critic_model_sind()
