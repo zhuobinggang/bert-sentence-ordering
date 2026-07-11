@@ -8,6 +8,7 @@ import numpy as np
 from sind import save_checkpoint, load_checkpoint, cal_tau, cal_acc, cal_PMR, TestResult
 # 假设你的基础函数库
 from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_paragraphs
+from critic_bert_simple import default_critic_model_sind, default_critic_model_rocs
 
 MAX_SENTENCE_TOKENS = 50
 
@@ -215,19 +216,6 @@ def train_nips():
     val_paragraphs = get_paragraphs('val')
     train(train_paragraphs, val_paragraphs=val_paragraphs, num_repeats=3, epochs_per_repeat=5, prefix='bert4so_nips')
 
-def default_critic_model_sind():
-    model = CriticBert()
-    load_checkpoint(model, 'checkpoints/critic_bert_sind_listmle_best.pth')
-    model.to(DEVICE)
-    model.eval()
-    return model
-
-def default_critic_model_rocs():
-    model = CriticBert()
-    load_checkpoint(model, 'checkpoints/critic_bert_rocs_listmle_best.pth')
-    model.to(DEVICE)
-    model.eval()
-    return model
 
 def valid_trained(model = None):
     if model is None:

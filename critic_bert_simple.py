@@ -8,6 +8,7 @@ import numpy as np
 from sind import save_checkpoint, load_checkpoint
 # 假设你的基础函数库
 from two_pass_plus import default_bert, default_tokenizer, DEVICE, sind_paragraphs
+from functools import lru_cache
 
 MAX_SENTENCE_TOKENS = 50
 
@@ -117,6 +118,7 @@ def train(sind = True, epoch = 5):
             best_acc = acc
             save_checkpoint(model, prefix=prefix, suffix='pointwise_best')
 
+@lru_cache(maxsize=1)
 def default_critic_model_sind():
     model = CriticBert()
     load_checkpoint(model, 'checkpoints/critic_sind_default.pth')
@@ -124,6 +126,7 @@ def default_critic_model_sind():
     model.eval()
     return model
 
+@lru_cache(maxsize=1)
 def default_critic_model_rocs():
     model = CriticBert()
     load_checkpoint(model, 'checkpoints/critic_rocs_default.pth')
@@ -131,6 +134,7 @@ def default_critic_model_rocs():
     model.eval()
     return model
 
+@lru_cache(maxsize=1)
 def default_critic_model_nips():
     model = CriticBert()
     load_checkpoint(model, 'checkpoints/critic_nips_default.pth')
