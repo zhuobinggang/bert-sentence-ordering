@@ -59,28 +59,32 @@ def sind():
     # 1. 定义属于“我们的手法”的标签
     our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2 critic', 'Random-3 critic']
 
-def double_draw():
+
+def double_draw_test():
     # ==================== 1. 数据准备 ====================
     # ROCStory 数据
-    labels_roc = ['BERT4SO♢', 'BERSON', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
-    x_roc = [1.0, 7.95, 1.0, 4.0, 6.0, 8.0]
-    y_roc = [0.8457, 0.88, 0.8518, 0.8593, 0.8622, 0.8633]
+    labels_roc = ['BERT4SO♢', 'BERSON', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4', 
+                  'BERT4SO♢ (Random-2)', 'BERT4SO♢ (Random-3)', 'BERT4SO♢ (Random-4)']
+    x_roc = [1.0, 7.95, 1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
+    y_roc = [0.8457, 0.88, 0.8518, 0.8593, 0.8622, 0.8633, 0.853, 0.854, 0.857]
 
     # SIND 数据
-    labels_sind = ['BERT4SO♢', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4']
-    x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 6.0, 8.0]
-    y_sind = [0.5837, 0.65, 0.67, 0.5900, 0.5986, 0.6048, 0.6054]
+    labels_sind = ['BERT4SO♢', 'BERSON', 'BERSON + BOID', 'Direct MLM', 'Random-2', 'Random-3', 'Random-4',
+                   'BERT4SO♢ (Random-2)', 'BERT4SO♢ (Random-3)', 'BERT4SO♢ (Random-4)']
+    x_sind = [1.0, 7.94, 7.94, 1.0, 4.0, 6.0, 8.0, 4.0, 6.0, 8.0]
+    y_sind = [0.5837, 0.65, 0.67, 0.5900, 0.5986, 0.6048, 0.6054, 0.590, 0.594, 0.596]
 
     # 我们手法的大类
     our_methods = ['Direct MLM', 'Top-3 critic', 'Random-2', 'Random-3', 'Random-4']
 
     # 需要用蓝色线连接显示趋势的特定手法列表
     line_methods = ['Direct MLM', 'Random-2', 'Random-3', 'Random-4']
-
+    
+    # 新增：需要用橘色线连接的基线趋势列表
+    baseline_line_methods = ['BERT4SO♢', 'BERT4SO♢ (Random-2)', 'BERT4SO♢ (Random-3)', 'BERT4SO♢ (Random-4)']
 
     # ==================== 2. 创建画布 ====================
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5))
-
 
     # ==================== 3. 核心绘图函数 ====================
     def plot_dataset(ax, x_data, y_data, labels_data, dataset_name):
@@ -94,36 +98,40 @@ def double_draw():
         labels_our = [l for l in labels_data if l in our_methods]
 
         # ------ 新增：绘制蓝色趋势线 ------
-        # 提取需要连线的数据点，并按照 x 坐标升序排序（防止因乱序导致连线交叉）
         line_points = [(x_data[i], y_data[i]) for i, l in enumerate(labels_data) if l in line_methods]
         line_points_sorted = sorted(line_points, key=lambda p: p[0])
-        
         if line_points_sorted:
             x_line, y_line = zip(*line_points_sorted)
-            # color 使用与 Ours 散点相同的蓝色 (#1f77b4)
-            # zorder=1 确保线在散点图标的下面，整体更整洁
             ax.plot(x_line, y_line, color='#1f77b4', linestyle='--', linewidth=1, alpha=0.8, zorder=1)
-        # --------------------------------
+        
+        # ------ 新增：绘制橘色趋势线 ------
+        b_line_points = [(x_data[i], y_data[i]) for i, l in enumerate(labels_data) if l in baseline_line_methods]
+        b_line_points_sorted = sorted(b_line_points, key=lambda p: p[0])
+        if b_line_points_sorted:
+            xb_line, yb_line = zip(*b_line_points_sorted)
+            ax.plot(xb_line, yb_line, color='#ff7f0e', linestyle='--', linewidth=1, alpha=0.8, zorder=1)
 
-        # 绘制散点（zorder=2 确保点在线的上方）
+        # 绘制散点
         ax.scatter(x_other, y_other, color='#ff7f0e', marker='o', s=120, label='Baselines', zorder=2)
         ax.scatter(x_our, y_our, color='#1f77b4', marker='^', s=120, label='Ours (Proposed)', zorder=2)
 
-        # 标注基线方法（针对重叠点做微调）
+        # 标注基线方法
         for i, txt in enumerate(labels_other):
             xytext = (6, 4)  # 默认位置
-            if dataset_name == 'ROCStory' and txt == 'BERT4SO':
-                xytext = (6, -14)  # 往下移，避免和 Direct MLM 叠在一起
+            if dataset_name == 'ROCStory' and txt == 'BERT4SO♢':
+                xytext = (6, -14)
             elif dataset_name == 'SIND' and txt == 'BERSON':
-                xytext = (6, -14)  # 往下移，避免和 BERSON + BOID 叠在一起
+                xytext = (6, -14)
+            # 对新增的 random 点，可以简写或调整标注位置以防重叠
+            if 'Random' in txt:
+                xytext = (6, -14) if '2' in txt or '3' in txt or '4' in txt else (6, 4)
             ax.annotate(txt, (x_other[i], y_other[i]), textcoords="offset points", xytext=xytext, fontsize=9.5)
 
         # 标注我们方法
         for i, txt in enumerate(labels_our):
             xytext = (6, 4)
-            # 优化 SIND 和 ROCStory 中 BERT4SO 处于下方的重叠标注
             if txt == 'Direct MLM':
-                xytext = (6, 6) # 稍微往上抬，把下方的空间留给基线 BERT4SO
+                xytext = (6, 6)
             elif txt == 'Top-3 critic':
                 xytext = (6, -14)
             ax.annotate(txt, (x_our[i], y_our[i]), textcoords="offset points", xytext=xytext, fontsize=9.5)
@@ -132,27 +140,20 @@ def double_draw():
         ax.set_title(dataset_name, fontsize=14, fontweight='bold', pad=10)
         ax.set_xlabel('Relative FLOPs', fontsize=12)
         ax.grid(True, linestyle='--', alpha=0.5)
-        ax.set_xlim(0.2, 9.5)  # 稍微放宽横轴，防止最右侧文字越界
-
+        ax.set_xlim(0.2, 9.5)
 
     # ==================== 4. 分别绘制左右子图 ====================
-    plot_dataset(ax1, x_sind, y_sind, labels_sind, 'SIND')       # 左边放 SIND
-    plot_dataset(ax2, x_roc, y_roc, labels_roc, 'ROCStory')     # 右边放 ROCStory
+    plot_dataset(ax1, x_sind, y_sind, labels_sind, 'SIND')
+    plot_dataset(ax2, x_roc, y_roc, labels_roc, 'ROCStory')
 
-    # 为两个图均添加 Y 轴标签（如果你需要的话）
     ax1.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
     ax2.set_ylabel('Kendall’s Tau (τ)', fontsize=12)
 
-    # ==================== 5. 提取并合并图例 ====================
     handles, labels = ax1.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=2, fontsize=11)
 
-    # 自动调整布局，防止边缘裁剪
     plt.tight_layout()
-
-    # 保存为 EPS 格式
     plt.savefig('datasets_comparison.pdf', bbox_inches='tight')
-    print("PDF 图表已成功生成并保存在当前目录下！")
 
 
 def double_draw_critic_strategy():
