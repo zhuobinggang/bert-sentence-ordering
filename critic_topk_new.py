@@ -34,9 +34,11 @@ def get_top_k_permutations_from_matrix(prob_matrix, top_k=5):
     import numpy as np
     from scipy.optimize import linear_sum_assignment
     
-    prob_matrix = np.array(prob_matrix)
+    # prob_matrix = np.array(prob_matrix)
+    prob_matrix = np.asarray(prob_matrix, dtype=np.float64)
+    prob_matrix = np.nan_to_num(prob_matrix, nan=0.0, posinf=0.0, neginf=0.0)
     n = len(prob_matrix)
-    eps = 1e-9
+    eps = 1e-12
     
     # 将概率矩阵转化为对数似然矩阵（因为要最大化总概率，转为对数后相加）
     # scipy 的 linear_sum_assignment 默认是最小化开销，所以我们取负号，变成求最小化负对数似然
