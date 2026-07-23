@@ -31,7 +31,7 @@ def valid_bert_topk_with_critic_nips(bert, critic, split = 'val', topk = 5, outp
         bert_input = nips_bert_input.nips_bert_input(random_paragraph, need_shuffle = False) # 代理shuffle
         input_ids = torch.tensor([bert_input.input_ids], dtype=torch.long).to(DEVICE)
         attention_mask = torch.tensor([bert_input.attention_mask], dtype=torch.long).to(DEVICE) # [1, 512]
-        label_ids = torch.tensor([bert_input.labels], dtype=torch.long).to(DEVICE) # [1, 512]
+        # label_ids = torch.tensor([bert_input.labels], dtype=torch.long).to(DEVICE) # [1, 512]
         with torch.no_grad():
             logits = bert(input_ids=input_ids, attention_mask=attention_mask).logits # [1, 512, 30522]
         mask_token_bool = (input_ids[0] == toker.mask_token_id)
@@ -39,8 +39,8 @@ def valid_bert_topk_with_critic_nips(bert, critic, split = 'val', topk = 5, outp
         label_tokens = [index_dict[i] for i in add_one(list(range(len(random_paragraph))))]
         predicted_token_ids = predicted_token_ids[:, label_tokens] # [n_mask_tokens, n_mask_tokens] 每个mask位置对应5个标签的logits
         prob_matrix_numpy = predicted_token_ids.cpu().numpy()
-        top5 = get_top_k_permutations_from_matrix(prob_matrix_numpy, top_k=5)
-        for temp_predicted_labels in top5:
+        candidates = get_top_k_permutations_from_matrix(prob_matrix_numpy, top_k=topk)
+        for temp_predicted_labels in candidates:
             temp_resorted_paragraph = resort_paragraph(random_paragraph, temp_predicted_labels)
             critic_score = get_critic_score(critic, temp_resorted_paragraph)
             if critic_score > best_critic_score:
@@ -70,7 +70,7 @@ def valid_bert_topk_with_critic_nips(bert, critic, split = 'val', topk = 5, outp
         }
     
     
-def valid_trained_in_folder_nips(npass = 3, split = 'test'):
+def valid_trained_in_folder_nips(topk = 3, split = 'test'):
     search_string = 'nips_repeat_'
     matching_files = common.search_files_in_directory(search_string, directory="./checkpoints")
     critic = default_critic_model_nips() 
@@ -82,7 +82,7 @@ def valid_trained_in_folder_nips(npass = 3, split = 'test'):
         load_checkpoint(bert, str(file))
         bert.to(DEVICE)
         bert.eval()
-        result = valid_bert_topk_with_critic_nips(bert, critic, split=split, npass=npass)
+        result = valid_bert_topk_with_critic_nips(bert, critic, split=split, topk=topk)
         taus.append(result.tau)
         accs.append(result.acc)
         pmrs.append(result.pmr)
