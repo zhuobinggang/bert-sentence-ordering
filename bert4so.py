@@ -1,5 +1,6 @@
 import random
 import common
+from draw import sind
 import rocs
 import torch
 from torch import nn
@@ -244,21 +245,13 @@ def valid_trained(model = None):
     print(f"Critic 判别准确率 (Pairwise Accuracy on Val): {acc:.4f}")
     return acc
 
-
-
-
-def test_order_consistency(model=None, sind=True):
+def test_order_consistency_raw(model, val_paragraphs):
     """
     检验模型是否会因为输入顺序的变化而改变最终的排序结果。
     做法：对同一个段落随机打乱两次，分别预测，看恢复出来的最终顺序是否一致。
     """
-    if model is None:
-        model = default_critic_model_sind() if sind else default_critic_model_rocs()
-    
     model.to(DEVICE)
     model.eval()
-    
-    val_paragraphs = sind_paragraphs('val') if sind else rocs.dataset_get()['val']
     
     inconsistent_count = 0
     total_count = 0
@@ -319,7 +312,20 @@ def test_order_consistency(model=None, sind=True):
     
     return inconsistency_rate
 
-def test_order_consistency_across_models(sind=True):
+
+def test_order_consistency(model=None, sind=True):
+    """
+    检验模型是否会因为输入顺序的变化而改变最终的排序结果。
+    做法：对同一个段落随机打乱两次，分别预测，看恢复出来的最终顺序是否一致。
+    """
+    if model is None:
+        model = default_critic_model_sind() if sind else default_critic_model_rocs()
+    val_paragraphs = sind_paragraphs('val') if sind else rocs.dataset_get()['val']
+    inconsistency_rate = test_order_consistency_raw(model, val_paragraphs)
+    return inconsistency_rate
+
+
+def test_order_consistency_across_models_raw(search_string, val_paragraphs):
     """
     自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
     并在指定的数据集上跑顺序一致性测试。
@@ -327,30 +333,37 @@ def test_order_consistency_across_models(sind=True):
     from pathlib import Path
     directory_path = Path("./checkpoints")
     
-    dataset_tag = 'sind' if sind else 'rocs'
-    search_string = f"{dataset_tag}_listmle_rep"
-    
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     
     if not matching_files:
         print(f"❌ 未在 {directory_path} 中找到包含 '{search_string}' 的模型权重文件。")
         return
 
-    print(f"🔍 找到 {len(matching_files)} 个匹配的模型，开始在 {dataset_tag.upper()} 上进行顺序一致性测试...")
+    print(f"🔍 找到 {len(matching_files)} 个匹配的模型，开始在 {search_string.upper()} 上进行顺序一致性测试...")
     
     for file in matching_files:
         model = CriticBert()
         load_checkpoint(model, str(file))
         model.to(DEVICE)
         model.eval()
-        
-        inconsistency_rate = test_order_consistency(model=model, sind=sind)
+        inconsistency_rate = test_order_consistency_raw(model, val_paragraphs)
         consistency_rate = 1.0 - inconsistency_rate
         
         result_str = f"Inconsistency Rate: {inconsistency_rate:.4%} | Consistency Rate: {consistency_rate:.4%}"
         
         print(f'Model: {file.name} -> {result_str}')
         common.logging.warning(f'Model: {file.name} -> {result_str}')
+
+
+def test_order_consistency_across_models(sind=True):
+    """
+    自动扫描 checkpoints 文件夹，加载所有训练好的 BERT4SO 模型，
+    并在指定的数据集上跑顺序一致性测试。
+    """
+    dataset_tag = 'sind' if sind else 'rocs'
+    search_string = f"{dataset_tag}_listmle_rep"
+    val_paragraphs = sind_paragraphs('val') if sind else rocs.dataset_get()['val']
+    return test_order_consistency_across_models_raw(search_string, val_paragraphs)
 
 def test_trained_one_model(model, test_paragraphs, need_shuffle=True):
     
@@ -465,3 +478,10 @@ def test_trained_nips(split='test', need_shuffle=True):
         return
     test_paragraphs = get_paragraphs(split)
     test_trained(matching_files, test_paragraphs, need_shuffle=need_shuffle)
+
+# 20260730 NIPS数据集的顺序一致性测试
+def test_order_consistency_across_models_nips(split='val'):
+    from nips_data import get_paragraphs
+    search_string = f"bert4so_nips_listmle"
+    val_paragraphs = get_paragraphs(split)
+    return test_order_consistency_across_models_raw(search_string, val_paragraphs)

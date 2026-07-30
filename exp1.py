@@ -32,3 +32,9 @@ def direct_mlm_with_correct_paragraphs_nips(split = 'val', need_shuffle = False)
 def bert4so_with_correct_paragraphs_nips(split = 'val', need_shuffle = False):
     from bert4so import test_trained_nips
     test_trained_nips(split = split, need_shuffle = need_shuffle)
+
+# 20260730 计算模型的非一致性在NIPS数据集上
+def test_order_consistency_across_models_nips():
+    import bert4so
+    inconsistency_rate = bert4so.test_order_consistency_across_models_nips(split='val')
+    return inconsistency_rate
