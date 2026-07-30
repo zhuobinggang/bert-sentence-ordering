@@ -1,6 +1,6 @@
 import random
 import common
-from draw import sind
+import sind
 import rocs
 import torch
 from torch import nn
