@@ -19,3 +19,12 @@ def direct_mlm_with_correct_paragraphs(use_sind = True, split = 'val'):
 def bert4so_with_correct_paragraphs(use_sind = True, split = 'val'):
     import bert4so
     bert4so.test_trained(sind = use_sind, split = split, need_shuffle = False)
+
+# 20260730 
+def direct_mlm_with_correct_paragraphs_nips(split = 'val', need_shuffle = False):
+    from nips_train import test_trained
+    if not need_shuffle:
+        print('不shuffle的情况下测试NIPS数据集的Direct MLM表现')
+    else:
+        print('shuffle的情况下测试NIPS数据集的Direct MLM表现')
+    test_trained(split = split, need_shuffle = need_shuffle)

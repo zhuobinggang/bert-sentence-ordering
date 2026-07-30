@@ -4,7 +4,7 @@ from nips_bert_input import nips_bert_input
 
 
 # 使用匈牙利算法解码得到标签
-def valid_bert_nips(bert, split = 'val'):
+def valid_bert_nips(bert, split = 'val', need_shuffle = True):
     if bert is None:
         bert = default_bert()
     bert.eval()
@@ -19,7 +19,7 @@ def valid_bert_nips(bert, split = 'val'):
     # index_1_to_5_token_ids = [index_dict[i] for i in range(1, 6)]
     random.seed(42)
     for paragraph in paragraphs:
-        bert_input = nips_bert_input(paragraph, need_shuffle = True)
+        bert_input = nips_bert_input(paragraph, need_shuffle = need_shuffle)
         input_ids = torch.tensor([bert_input.input_ids], dtype=torch.long).to(DEVICE)
         attention_mask = torch.tensor([bert_input.attention_mask], dtype=torch.long).to(DEVICE) # [1, 512]
         label_ids = torch.tensor([bert_input.labels], dtype=torch.long).to(DEVICE) # [1, 512]
@@ -108,13 +108,13 @@ def checkpoint_paths():
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     return matching_files
 
-def test_trained():
+def test_trained(split = 'test', need_shuffle = True):
     ckpts = checkpoint_paths()
     results = []
     for file in ckpts:
         bert = default_bert()
         load_checkpoint(bert, str(file)) # 已默认将模型移动到DEVICE上并设置为eval模式
-        result = valid_bert_nips(bert, 'test')
+        result = valid_bert_nips(bert, split, need_shuffle)
         results.append(result)
         print(f'Model nips repeat: {file}, Test Result: {result}')
         common.logging.warning(f'Model nips repeat: {file}, Test Result: {result}')

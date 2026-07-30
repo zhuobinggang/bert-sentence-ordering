@@ -4,8 +4,8 @@ from sind import *
 import rocs
 
 # 计算sind数据集的信息
-def sind_average_tokens():
-    paragraphs = sind_paragraphs('val')
+def sind_average_tokens(split = 'val'):
+    paragraphs = sind_paragraphs(split)
     toker = default_tokenizer()
     token_counts = []
     for paragraph in paragraphs:
@@ -14,8 +14,8 @@ def sind_average_tokens():
         token_counts.append(len(tokens))
     print(f'平均token数量: {sum(token_counts) / len(token_counts)}')
 
-def rocs_average_tokens():
-    paragraphs = rocs.dataset_get()['val']
+def rocs_average_tokens(split = 'val'):
+    paragraphs = rocs.dataset_get()[split]
     toker = default_tokenizer()
     token_counts = []
     for paragraph in paragraphs:
@@ -25,9 +25,9 @@ def rocs_average_tokens():
     print(f'平均token数量: {sum(token_counts) / len(token_counts)}')
 
 # 段落单位的平均token数量
-def nips_average_tokens():
+def nips_average_tokens(split = 'val'):
     import nips_data
-    paragraphs = nips_data.process_nips_dataset('val')[0]
+    paragraphs = nips_data.process_nips_dataset(split)[0]
     toker = default_tokenizer()
     token_counts = []
     for paragraph in paragraphs:
@@ -36,9 +36,9 @@ def nips_average_tokens():
         token_counts.append(len(tokens))
     print(f'平均token数量: {sum(token_counts) / len(token_counts)}')
 
-def nips_average_tokens_per_sentence():
+def nips_average_tokens_per_sentence(split = 'val'):
     import nips_data
-    paragraphs = nips_data.process_nips_dataset('val')[0]
+    paragraphs = nips_data.process_nips_dataset(split)[0]
     toker = default_tokenizer()
     token_counts = []
     for paragraph in paragraphs:
