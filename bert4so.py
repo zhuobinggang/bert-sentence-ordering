@@ -455,7 +455,7 @@ def test_trained_rocs():
     test_paragraphs = rocs.dataset_get()['test']
     test_trained(matching_files, test_paragraphs)
 
-def test_trained_nips():
+def test_trained_nips(split='test', need_shuffle=True):
     from nips_data import get_paragraphs
     search_string = f"bert4so_nips"
     # 找出文件夹下所有匹配的 pth/ckpt 文件
@@ -463,5 +463,5 @@ def test_trained_nips():
     if not matching_files:
         print(f"❌ 未找到包含 '{search_string}' 的模型权重文件。")
         return
-    test_paragraphs = get_paragraphs('test')
-    test_trained(matching_files, test_paragraphs)
+    test_paragraphs = get_paragraphs(split)
+    test_trained(matching_files, test_paragraphs, need_shuffle=need_shuffle)
