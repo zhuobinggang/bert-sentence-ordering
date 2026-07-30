@@ -34,7 +34,12 @@ def bert4so_with_correct_paragraphs_nips(split = 'val', need_shuffle = False):
     test_trained_nips(split = split, need_shuffle = need_shuffle)
 
 # 20260730 计算模型的非一致性在NIPS数据集上
-def test_order_consistency_across_models_nips():
+def test_order_consistency_across_models_nips_bert4so():
+    # TODO: 检查是不是有问题，不一致率50%？吓人
     import bert4so
     inconsistency_rate = bert4so.test_order_consistency_across_models_nips(split='val')
     return inconsistency_rate
+
+def test_order_consistency_across_models_nips_direct_mlm():
+    from critic_randomk import valid_bert_n_pass_coherency
+    # TODO: 明天再补
