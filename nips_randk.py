@@ -95,3 +95,59 @@ def valid_trained_in_folder_nips(npass = 3, split = 'test'):
     common.cal_mean_std(accs)
     print('PMRs:')
     common.cal_mean_std(pmrs)
+
+
+# 20260731 计算模型的非一致性在NIPS数据集上
+def nips_consistent_rate_one_model(bert, split = 'val', npass = 2):
+    paragraphs = nips_data.get_paragraphs(split)
+    toker = default_tokenizer()
+    results = [] # 1表示一致，0表示不一致
+    printed = False
+    index_dict = indexs_tokenized()
+    for paragraph in tqdm(paragraphs):
+        best_critic_score = float('-inf')
+        best_predicted_labels = None
+        labels = None
+        stored_resorted_labels = [] # 存储每次解码的 predicted_labels，如果已经有了，就不再评分了
+        # npass次解码
+        paragraph_length = len(paragraph)
+        result = 1 # 默认一致
+        for _ in range(npass):
+            random_labels  = add_one(random.sample(range(paragraph_length), paragraph_length)) # 随机打乱标签
+            random_paragraph = recover_unsorted_paragraph(paragraph, random_labels)
+            bert_input = nips_bert_input.nips_bert_input(random_paragraph, need_shuffle = False) # 代理shuffle
+            input_ids = torch.tensor([bert_input.input_ids], dtype=torch.long).to(DEVICE)
+            attention_mask = torch.tensor([bert_input.attention_mask], dtype=torch.long).to(DEVICE) # [1, 512]
+            label_ids = torch.tensor([bert_input.labels], dtype=torch.long).to(DEVICE) # [1, 512]
+            with torch.no_grad():
+                logits = bert(input_ids=input_ids, attention_mask=attention_mask).logits # [1, 512, 30522]
+            mask_token_bool = (input_ids[0] == toker.mask_token_id)
+            predicted_token_ids = logits[0, mask_token_bool] # [n_mask_tokens, vocab_size]
+            label_tokens = [index_dict[i] for i in add_one(list(range(len(random_paragraph))))]
+            predicted_token_ids = predicted_token_ids[:, label_tokens] # [n_mask_tokens, n_mask_tokens] 每个mask位置对应5个标签的logits
+            temp_predicted_labels = hungarian_algorithm_best_order(predicted_token_ids.cpu().numpy())
+            resorted_labels = resort_paragraph(random_labels, temp_predicted_labels)
+            if not list_in(resorted_labels, stored_resorted_labels): # 性能优化：如果已经有了，就不再评分了
+                result = 0 # 不一致
+                break # 不一致就直接break
+            else:
+                stored_resorted_labels.append(resorted_labels)
+        results.append(result)
+    inconsistency_rate = 1 - sum(results) / len(results) 
+    return inconsistency_rate
+
+def nips_consistent_rate_across_models(split = 'val', npass = 2):
+    from pathlib import Path
+    directory_path = Path("./checkpoints")
+    matching_files = [file for file in directory_path.glob(f"NIPS_best_*") if file.is_file()]
+    inconsistency_rates = []
+    for file in matching_files:
+        bert = default_bert()
+        load_checkpoint(bert, str(file))
+        bert.to(DEVICE)
+        bert.eval()
+        inconsistency_rate = nips_consistent_rate_one_model(bert, split=split, npass=npass)
+        print(f'Model {file}, Inconsistency Rate: {inconsistency_rate:.4f}')
+        # common.logging.warning(f'Model {file}, Inconsistency Rate: {inconsistency_rate:.4f}')
+        inconsistency_rates.append(inconsistency_rate)
+    common.cal_mean_std(inconsistency_rates)

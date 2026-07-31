@@ -91,17 +91,10 @@ def valid_bert_n_pass_random_with_critic(bert, critic, split = 'val', npass = 3,
             'all_predicted_labels': all_predicted_labels,
             'all_true_labels': all_true_labels
         }
-    
-# 计算模型在 coherency 上的表现，npass 次解码，如果每次解码的结果都一致，则认为是 coherent 的
-# 结果已汇报
-def valid_bert_n_pass_coherency(sind = True, split = 'val', npass = 2):
-    if sind:
-        paragraphs = sind_paragraphs(split)
-    else:
-        paragraphs = rocs.dataset_get()[split]
+
+def valid_bert_n_pass_coherency_raw(search_string, paragraphs, npass = 2):
     from pathlib import Path
     directory_path = Path("./checkpoints")
-    search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
     matching_files = [file for file in directory_path.glob(f"*{search_string}*") if file.is_file()]
     for file in matching_files:
         bert = default_bert()
@@ -128,4 +121,14 @@ def valid_bert_n_pass_coherency(sind = True, split = 'val', npass = 2):
                     predicted_labels.append(temp_resorted_labels)
             results.append(1 if consistent else 0)
         print(f'Coherency: {sum(results)}/{len(results)} = {sum(results)/len(results)}')
+
+# 计算模型在 coherency 上的表现，npass 次解码，如果每次解码的结果都一致，则认为是 coherent 的
+# 结果已汇报
+def valid_bert_n_pass_coherency(sind = True, split = 'val', npass = 2):
+    if sind:
+        paragraphs = sind_paragraphs(split)
+    else:
+        paragraphs = rocs.dataset_get()[split]
+    search_string = '_vanilla_sind_' if sind else '_vanilla_rocs_'
+    return valid_bert_n_pass_coherency_raw(search_string, paragraphs, npass = npass)
     

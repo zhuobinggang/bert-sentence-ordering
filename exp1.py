@@ -41,5 +41,5 @@ def test_order_consistency_across_models_nips_bert4so():
     return inconsistency_rate
 
 def test_order_consistency_across_models_nips_direct_mlm():
-    from critic_randomk import valid_bert_n_pass_coherency
-    # TODO: 明天再补
+    from nips_randk import nips_consistent_rate_across_models
+    nips_consistent_rate_across_models(split='val', npass=2)
