@@ -127,7 +127,7 @@ def nips_consistent_rate_one_model(bert, split = 'val', npass = 2):
             predicted_token_ids = predicted_token_ids[:, label_tokens] # [n_mask_tokens, n_mask_tokens] 每个mask位置对应5个标签的logits
             temp_predicted_labels = hungarian_algorithm_best_order(predicted_token_ids.cpu().numpy())
             resorted_labels = resort_paragraph(random_labels, temp_predicted_labels)
-            if not list_in(resorted_labels, stored_resorted_labels): # 性能优化：如果已经有了，就不再评分了
+            if len(stored_resorted_labels) > 0 and not list_in(resorted_labels, stored_resorted_labels): # 性能优化：如果已经有了，就不再评分了
                 result = 0 # 不一致
                 break # 不一致就直接break
             else:
